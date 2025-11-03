@@ -396,7 +396,7 @@ bot.on('photo', async (msg) => {
       parse_mode: 'Markdown',
     });
 
-    console.log(`[Photo SAVED] ${isChatImg ? 'Chat ' + chatId : msg.from.first_name} → ${fileUrl}`);
+    // console.log(`[Photo SAVED] ${isChatImg ? 'Chat ' + chatId : msg.from.first_name} → ${fileUrl}`);
   } catch (err) {
     console.error('Error saving photo:', err);
     bot.sendMessage(chatId, '⚠️ Dạ em xin lỗi, có lỗi khi lưu ảnh ạ!');
@@ -418,7 +418,7 @@ bot.onText(/\/getPhoto (.+)/, async (msg, match) => {
       });
       return;
     }
-    console.log("photo url:", photoDoc.url)
+
     bot.sendPhoto(chatId, photoDoc.url, {
       caption: `📸 Ảnh *${photoName}* của ${msg.from.first_name} nè ạ!`,
       parse_mode: 'Markdown',
@@ -443,7 +443,7 @@ bot.onText(/\/getChatImg (.+)/, async (msg, match) => {
       });
       return;
     }
-    console.log("chat img url:", photoDoc.url)
+
     bot.sendPhoto(chatId, photoDoc.url, {
       caption: `📸 Ảnh *${photoName}* của nhóm nè ạ!`,
       parse_mode: 'Markdown',
