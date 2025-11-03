@@ -161,4 +161,4 @@ simple_bot/
 
 ## License
 
-ISC
+MIT
