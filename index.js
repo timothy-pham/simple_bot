@@ -94,7 +94,7 @@ bot.on('message', async (msg) => {
         .map(line => line.replace(/^[-•]\s*/, '').trim())
         .filter(line => line && !line.toLowerCase().includes('thực đơn'));
 
-      const matchedDish = menuItems.find(item => item.toLowerCase() === text.toLowerCase());
+      const matchedDish = menuItems.find(item => text.toLowerCase().includes(item.toLowerCase()));
 
       if (!matchedDish) return;
 
@@ -245,6 +245,29 @@ bot.onText(/\/monthlySummary/, async (msg) => {
   }
 });
 
+// /menu command
+bot.onText(/\/menu/, async (msg) => {
+  const chatId = msg.chat.id;
+
+  try {
+    const { start, end } = getTodayRange();
+    const todayMenu = await Menu.findOne({
+      chatId: chatId.toString(),
+      date: { $gte: start, $lte: end }
+    });
+
+    if (!todayMenu) {
+      bot.sendMessage(chatId, '🍽 Dạ hôm nay chưa có thực đơn nào hết ạ!');
+      return;
+    }
+
+    bot.sendMessage(chatId, `🍽 *Thực đơn hôm nay nè ạ:*\n\n${todayMenu.text}`, { parse_mode: 'Markdown' });
+  } catch (error) {
+    console.error('Error getting menu:', error);
+    bot.sendMessage(chatId, '⚠️ Dạ em xin lỗi, có lỗi khi lấy thực đơn ạ!');
+  }
+});
+
 // /start command
 bot.onText(/\/start/, (msg) => {
   const chatId = msg.chat.id;
@@ -272,6 +295,7 @@ bot.onText(/\/help/, (msg) => {
     `💬 *Các lệnh hỗ trợ:* \n` +
     `/start - Bắt đầu làm quen với em nè 💖\n` +
     `/help - Xem lại hướng dẫn sử dụng 📖\n` +
+    `/menu - Xem thực đơn hôm nay 🍽\n` +
     `/summary - Thống kê hôm nay 🍱\n` +
     `/weeklySummary - Thống kê tuần 📆\n` +
     `/monthlySummary - Thống kê tháng 🗓️\n` +
