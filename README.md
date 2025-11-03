@@ -1,6 +1,7 @@
-# Simple Bot - Telegram Food Ordering Bot
+# Simple Bot - Telegram Food Ordering And Storage Photo Bot
 
 Bot Telegram đơn giản hỗ trợ đặt cơm hằng ngày trong group, lưu dữ liệu vào MongoDB và thống kê kết quả.
+Ngoài ra còn hỗ trợ lưu trữ và truy xuất hình ảnh theo người dùng.
 
 ## Tính năng
 
