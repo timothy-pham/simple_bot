@@ -1,0 +1,17 @@
+version: "3.8"
+
+services:
+  # Telegram Bot service
+  bot:
+    build: .
+    container_name: simple_bot_app
+    ports:
+      - "3052:3052"
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+    depends_on:
+      - mongodb
+    network_mode: myvps
+    restart: unless-stopped

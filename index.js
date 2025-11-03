@@ -58,7 +58,7 @@ const countDishes = (orders) => {
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
   const text = msg.text;
-  
+
   if (!text) return;
 
   // Check if admin is posting menu
@@ -81,7 +81,32 @@ bot.on('message', async (msg) => {
       const { start, end } = getTodayRange();
       const userId = msg.from.id.toString();
       const userName = msg.from.first_name + (msg.from.last_name ? ' ' + msg.from.last_name : '');
-      
+
+      // Lấy thực đơn hôm nay trong group
+      const todayMenu = await Menu.findOne({
+        chatId: chatId.toString(),
+        date: { $gte: start, $lte: end }
+      });
+
+      if (!todayMenu) {
+        // bot.sendMessage(chatId, '⚠️ Chưa có thực đơn hôm nay, không thể đặt món!');
+        return;
+      }
+
+      // Tách danh sách món từ thực đơn (lọc ra từng dòng có tên món)
+      const menuItems = todayMenu.text
+        .split('\n')
+        .map(line => line.replace(/^[-•]\s*/, '').trim()) // bỏ ký hiệu đầu dòng
+        .filter(line => line && !line.toLowerCase().includes('thực đơn')); // bỏ dòng tiêu đề
+
+      // Kiểm tra món có trong menu không (so sánh không phân biệt hoa thường)
+      const matchedDish = menuItems.find(item => item.toLowerCase() === text.toLowerCase());
+
+      if (!matchedDish) {
+        // bot.sendMessage(chatId, '❌ Món này không có trong thực đơn hôm nay!');
+        return;
+      }
+
       // Check if user already has an order today
       const existingOrder = await Order.findOne({
         userId: userId,
@@ -90,34 +115,33 @@ bot.on('message', async (msg) => {
       });
 
       if (existingOrder) {
-        // Update existing order
-        existingOrder.dish = text;
+        existingOrder.dish = matchedDish;
         existingOrder.createdAt = new Date();
         await existingOrder.save();
-        bot.sendMessage(chatId, `✅ ${userName} đã cập nhật đặt món: ${text}`);
+        bot.sendMessage(chatId, `✅ ${userName} đã cập nhật đặt món: ${matchedDish}`);
       } else {
-        // Create new order
         const order = new Order({
           userId: userId,
           userName: userName,
           chatId: chatId.toString(),
-          dish: text,
+          dish: matchedDish,
           date: new Date()
         });
         await order.save();
-        bot.sendMessage(chatId, `✅ ${userName} đã đặt món: ${text}`);
+        bot.sendMessage(chatId, `✅ ${userName} đã đặt món: ${matchedDish}`);
       }
     } catch (error) {
       console.error('Error saving order:', error);
       bot.sendMessage(chatId, '❌ Lỗi khi đặt món!');
     }
   }
+
 });
 
 // /summary command - Show daily summary
 bot.onText(/\/summary/, async (msg) => {
   const chatId = msg.chat.id;
-  
+
   try {
     const { start, end } = getTodayRange();
     const orders = await Order.find({
@@ -162,7 +186,7 @@ bot.onText(/\/summary/, async (msg) => {
 // /reset command - Clear daily orders
 bot.onText(/\/reset/, async (msg) => {
   const chatId = msg.chat.id;
-  
+
   try {
     const { start, end } = getTodayRange();
     const result = await Order.deleteMany({
@@ -177,10 +201,10 @@ bot.onText(/\/reset/, async (msg) => {
   }
 });
 
-// /weekly_summary command - Show weekly summary
-bot.onText(/\/weekly_summary/, async (msg) => {
+// /weeklySummary command - Show weekly summary
+bot.onText(/\/weeklySummary/, async (msg) => {
   const chatId = msg.chat.id;
-  
+
   try {
     const { start, end } = getWeekRange();
     const orders = await Order.find({
@@ -210,10 +234,10 @@ bot.onText(/\/weekly_summary/, async (msg) => {
   }
 });
 
-// /monthly_summary command - Show monthly summary
-bot.onText(/\/monthly_summary/, async (msg) => {
+// /monthlySummary command - Show monthly summary
+bot.onText(/\/monthlySummary/, async (msg) => {
   const chatId = msg.chat.id;
-  
+
   try {
     const { start, end } = getMonthRange();
     const orders = await Order.find({
@@ -241,6 +265,43 @@ bot.onText(/\/monthly_summary/, async (msg) => {
     console.error('Error getting monthly summary:', error);
     bot.sendMessage(chatId, '❌ Lỗi khi lấy thống kê tháng!');
   }
+});
+
+// /start command - Welcome message
+bot.onText(/\/start/, async (msg) => {
+  const chatId = msg.chat.id;
+  const userName = msg.from.first_name;
+
+  const welcomeMessage = `Xin chào ${userName}! 👋\n\n` +
+    `🤖 Bot đặt món ăn của nhóm\n\n` +
+    `Sử dụng /help để xem hướng dẫn sử dụng.`;
+
+  bot.sendMessage(chatId, welcomeMessage);
+});
+
+// /help command - Show help message
+bot.onText(/\/help/, async (msg) => {
+  const chatId = msg.chat.id;
+
+  const helpMessage = `📖 *Hướng dẫn sử dụng bot*\n\n` +
+    `*Đặt món:*\n` +
+    `Để đặt món, chỉ cần gửi tên món ăn (phải có trong thực đơn hôm nay)\n` +
+    `Ví dụ: Cơm gà\n\n` +
+    `*Admin đăng thực đơn:*\n` +
+    `Em gửi thực đơn hôm nay...\n` +
+    `- Món 1\n` +
+    `- Món 2\n` +
+    `- Món 3\n\n` +
+    `*Các lệnh:*\n` +
+    `/start - Bắt đầu sử dụng bot\n` +
+    `/help - Hiển thị trợ giúp\n` +
+    `/summary - Xem thống kê đặt món hôm nay\n` +
+    `/weeklySummary - Xem thống kê tuần này\n` +
+    `/monthlySummary - Xem thống kê tháng này\n` +
+    `/reset - Xóa tất cả đơn đặt món hôm nay\n\n` +
+    `💡 Mỗi người chỉ đặt được 1 món/ngày. Đặt món mới sẽ cập nhật món cũ.`;
+
+  bot.sendMessage(chatId, helpMessage, { parse_mode: 'Markdown' });
 });
 
 // Error handling
