@@ -41,6 +41,19 @@ const getMonthRange = () => {
   return { start, end };
 };
 
+// Helper function to count dishes from orders
+const countDishes = (orders) => {
+  const dishCount = {};
+  orders.forEach(order => {
+    if (dishCount[order.dish]) {
+      dishCount[order.dish]++;
+    } else {
+      dishCount[order.dish] = 1;
+    }
+  });
+  return dishCount;
+};
+
 // Listen for admin menu posting: "Em gửi thực đơn hôm nay..."
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
@@ -180,15 +193,8 @@ bot.onText(/\/weekly_summary/, async (msg) => {
       return;
     }
 
-    // Count dishes
-    const dishCount = {};
-    orders.forEach(order => {
-      if (dishCount[order.dish]) {
-        dishCount[order.dish]++;
-      } else {
-        dishCount[order.dish] = 1;
-      }
-    });
+    // Count dishes using helper function
+    const dishCount = countDishes(orders);
 
     // Format message
     let message = '📊 *Thống kê đặt món tuần này:*\n\n';
@@ -220,15 +226,8 @@ bot.onText(/\/monthly_summary/, async (msg) => {
       return;
     }
 
-    // Count dishes
-    const dishCount = {};
-    orders.forEach(order => {
-      if (dishCount[order.dish]) {
-        dishCount[order.dish]++;
-      } else {
-        dishCount[order.dish] = 1;
-      }
-    });
+    // Count dishes using helper function
+    const dishCount = countDishes(orders);
 
     // Format message
     let message = '📊 *Thống kê đặt món tháng này:*\n\n';
