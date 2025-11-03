@@ -1,0 +1,26 @@
+{
+  "name": "simple_bot",
+  "version": "1.0.0",
+  "description": "Simple Telegram bot for daily food ordering",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js"
+  },
+  "keywords": [
+    "telegram",
+    "bot",
+    "food",
+    "order"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "node-telegram-bot-api": "^0.66.0",
+    "mongoose": "^8.0.0",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  }
+}
