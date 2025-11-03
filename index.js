@@ -308,13 +308,18 @@ bot.onText(/\/help/, (msg) => {
     `/monthlySummary - Thống kê tháng 🗓️\n` +
     `/reset - Xoá đơn đặt món hôm nay 🧹\n` +
     `/savePhoto <tên> - Lưu ảnh với tên chỉ định 📸\n` +
-    `/getPhoto <tên> - Lấy ảnh đã lưu với tên chỉ định 🔍\n\n` +
+    `/getPhoto <tên> - Lấy ảnh đã lưu với tên chỉ định 🔍\n` +
+    `/renamePhoto <tên cũ> <tên mới> - Đổi tên ảnh đã lưu 🔄\n` +
+    `/saveChatImg <tên> - Lưu ảnh nhóm với tên chỉ định 📸\n` +
+    `/getChatImg <tên> - Lấy ảnh nhóm đã lưu với tên chỉ định 🔍\n` +
+    `/renameChatImg <tên cũ> <tên mới> - Đổi tên ảnh nhóm 🔄\n\n` +
     `💡 Mỗi người chỉ đặt được 1 món/ngày thôi ạ. Nếu đặt lại thì em sẽ tự cập nhật nha ♥️`;
 
   bot.sendMessage(chatId, helpMessage, { parse_mode: 'Markdown' });
 });
 
 const waitingForPhoto = {}; // userId -> photoName
+const waitingForChatImg = {}; // chatId -> photoName
 
 // 💾 Command: /savePhoto momo
 bot.onText(/\/savePhoto (.+)/, async (msg, match) => {
@@ -328,15 +333,35 @@ bot.onText(/\/savePhoto (.+)/, async (msg, match) => {
   });
 });
 
+// 💾 Command: /saveChatImg momo
+bot.onText(/\/saveChatImg (.+)/, async (msg, match) => {
+  const chatId = msg.chat.id;
+  const photoName = match[1].trim();
+
+  waitingForChatImg[chatId] = photoName;
+  bot.sendMessage(chatId, `📸 Dạ nhóm ơi, gửi ảnh *${photoName}* cho em nha ạ!`, {
+    parse_mode: 'Markdown',
+  });
+});
+
 // 📷 Khi user gửi ảnh
 bot.on('photo', async (msg) => {
   const chatId = msg.chat.id;
   const userId = msg.from.id;
 
-  if (!waitingForPhoto[userId]) return;
+  let photoName;
+  let isChatImg = false;
 
-  const photoName = waitingForPhoto[userId];
-  delete waitingForPhoto[userId]; // clear state
+  if (waitingForChatImg[chatId]) {
+    photoName = waitingForChatImg[chatId];
+    delete waitingForChatImg[chatId];
+    isChatImg = true;
+  } else if (waitingForPhoto[userId]) {
+    photoName = waitingForPhoto[userId];
+    delete waitingForPhoto[userId];
+  } else {
+    return;
+  }
 
   try {
     const photo = msg.photo[msg.photo.length - 1]; // ảnh độ phân giải cao nhất
@@ -347,7 +372,7 @@ bot.on('photo', async (msg) => {
     const buffer = Buffer.from(response.data);
 
     const photoNameify = slugify(photoName, { lower: true });
-    const minioPath = `${userId}_${photoNameify}_${Date.now()}.jpg`
+    const minioPath = `${isChatImg ? 'chat_' + chatId : userId}_${photoNameify}_${Date.now()}.jpg`
     const metaData = {
       'Content-Type': mime.lookup(minioPath) || 'image/jpeg',
       'Content-Disposition': 'inline',
@@ -359,9 +384,10 @@ bot.on('photo', async (msg) => {
     // URL public
     const fileUrl = `https://${process.env.MINIO_ENDPOINT}/telebot/${minioPath}`;
 
-    // Lưu DB, nếu đã có tên thì cập nhật lại url
+    // Lưu DB
+    const query = isChatImg ? { chatId: chatId.toString(), photoName } : { userId, photoName };
     const photoDoc = await Photo.findOneAndUpdate(
-      { userId, photoName },
+      query,
       { url: fileUrl },
       { new: true, upsert: true }
     );
@@ -370,10 +396,10 @@ bot.on('photo', async (msg) => {
       parse_mode: 'Markdown',
     });
 
-    console.log(`[Photo SAVED] ${msg.from.first_name} → ${fileUrl}`);
+    console.log(`[Photo SAVED] ${isChatImg ? 'Chat ' + chatId : msg.from.first_name} → ${fileUrl}`);
   } catch (err) {
-    console.error('Error saving QR:', err);
-    bot.sendMessage(chatId, '⚠️ Dạ em xin lỗi, có lỗi khi lưu ảnh QR ạ!');
+    console.error('Error saving photo:', err);
+    bot.sendMessage(chatId, '⚠️ Dạ em xin lỗi, có lỗi khi lưu ảnh ạ!');
   }
 });
 
@@ -400,6 +426,90 @@ bot.onText(/\/getPhoto (.+)/, async (msg, match) => {
   } catch (err) {
     console.error('Error fetching photo:', err);
     bot.sendMessage(chatId, '⚠️ Dạ em xin lỗi, có lỗi khi lấy ảnh ạ!');
+  }
+});
+
+// 🔍 Command: /getChatImg momo
+bot.onText(/\/getChatImg (.+)/, async (msg, match) => {
+  const chatId = msg.chat.id;
+  const photoName = match[1].trim();
+
+  try {
+    const photoDoc = await Photo.findOne({ chatId: chatId.toString(), photoName });
+
+    if (!photoDoc) {
+      bot.sendMessage(chatId, `❌ Dạ em không tìm thấy ảnh *${photoName}* của nhóm ạ!`, {
+        parse_mode: 'Markdown',
+      });
+      return;
+    }
+    console.log("chat img url:", photoDoc.url)
+    bot.sendPhoto(chatId, photoDoc.url, {
+      caption: `📸 Ảnh *${photoName}* của nhóm nè ạ!`,
+      parse_mode: 'Markdown',
+    });
+  } catch (err) {
+    console.error('Error fetching chat img:', err);
+    bot.sendMessage(chatId, '⚠️ Dạ em xin lỗi, có lỗi khi lấy ảnh nhóm ạ!');
+  }
+});
+
+// 🔄 Command: /renamePhoto oldName newName
+bot.onText(/\/renamePhoto (.+) (.+)/, async (msg, match) => {
+  const chatId = msg.chat.id;
+  const userId = msg.from.id;
+  const oldName = match[1].trim();
+  const newName = match[2].trim();
+
+  try {
+    const photoDoc = await Photo.findOneAndUpdate(
+      { userId, photoName: oldName },
+      { photoName: newName },
+      { new: true }
+    );
+
+    if (!photoDoc) {
+      bot.sendMessage(chatId, `❌ Dạ em không tìm thấy ảnh *${oldName}* của ${msg.from.first_name} để đổi tên ạ!`, {
+        parse_mode: 'Markdown',
+      });
+      return;
+    }
+
+    bot.sendMessage(chatId, `✅ Dạ em đã đổi tên ảnh từ *${oldName}* thành *${newName}* rồi ạ!`, {
+      parse_mode: 'Markdown',
+    });
+  } catch (err) {
+    console.error('Error renaming photo:', err);
+    bot.sendMessage(chatId, '⚠️ Dạ em xin lỗi, có lỗi khi đổi tên ảnh ạ!');
+  }
+});
+
+// 🔄 Command: /renameChatImg oldName newName
+bot.onText(/\/renameChatImg (.+) (.+)/, async (msg, match) => {
+  const chatId = msg.chat.id;
+  const oldName = match[1].trim();
+  const newName = match[2].trim();
+
+  try {
+    const photoDoc = await Photo.findOneAndUpdate(
+      { chatId: chatId.toString(), photoName: oldName },
+      { photoName: newName },
+      { new: true }
+    );
+
+    if (!photoDoc) {
+      bot.sendMessage(chatId, `❌ Dạ em không tìm thấy ảnh *${oldName}* của nhóm để đổi tên ạ!`, {
+        parse_mode: 'Markdown',
+      });
+      return;
+    }
+
+    bot.sendMessage(chatId, `✅ Dạ em đã đổi tên ảnh nhóm từ *${oldName}* thành *${newName}* rồi ạ!`, {
+      parse_mode: 'Markdown',
+    });
+  } catch (err) {
+    console.error('Error renaming chat img:', err);
+    bot.sendMessage(chatId, '⚠️ Dạ em xin lỗi, có lỗi khi đổi tên ảnh nhóm ạ!');
   }
 });
 

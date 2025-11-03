@@ -63,7 +63,7 @@ Sử dụng lệnh `/monthlySummary` để xem thống kê món ăn trong tháng
 
 Bot hỗ trợ lưu trữ và truy xuất ảnh cá nhân của người dùng.
 
-#### Lưu ảnh
+#### Lưu ảnh cá nhân
 
 Sử dụng lệnh `/savePhoto <tên>` để chuẩn bị lưu ảnh với tên chỉ định, sau đó gửi ảnh vào chat.
 
@@ -75,7 +75,7 @@ Sử dụng lệnh `/savePhoto <tên>` để chuẩn bị lưu ảnh với tên 
 
 Sau đó gửi ảnh QR code hoặc bất kỳ ảnh nào.
 
-#### Lấy ảnh
+#### Lấy ảnh cá nhân
 
 Sử dụng lệnh `/getPhoto <tên>` để lấy ảnh đã lưu với tên chỉ định.
 
@@ -83,6 +83,52 @@ Sử dụng lệnh `/getPhoto <tên>` để lấy ảnh đã lưu với tên ch�
 
 ```
 /getPhoto momo
+```
+
+#### Đổi tên ảnh cá nhân
+
+Sử dụng lệnh `/renamePhoto <tên cũ> <tên mới>` để đổi tên ảnh đã lưu.
+
+**Ví dụ:**
+
+```
+/renamePhoto momo momo2
+```
+
+### 7. Ảnh nhóm
+
+Bot hỗ trợ lưu trữ và truy xuất ảnh chia sẻ trong nhóm chat.
+
+#### Lưu ảnh nhóm
+
+Sử dụng lệnh `/saveChatImg <tên>` để chuẩn bị lưu ảnh nhóm với tên chỉ định, sau đó gửi ảnh vào chat.
+
+**Ví dụ:**
+
+```
+/saveChatImg menu
+```
+
+Sau đó gửi ảnh thực đơn hoặc bất kỳ ảnh nào.
+
+#### Lấy ảnh nhóm
+
+Sử dụng lệnh `/getChatImg <tên>` để lấy ảnh nhóm đã lưu với tên chỉ định.
+
+**Ví dụ:**
+
+```
+/getChatImg menu
+```
+
+#### Đổi tên ảnh nhóm
+
+Sử dụng lệnh `/renameChatImg <tên cũ> <tên mới>` để đổi tên ảnh nhóm đã lưu.
+
+**Ví dụ:**
+
+```
+/renameChatImg menu menu_today
 ```
 
 ## Cài đặt
@@ -119,6 +165,9 @@ cp .env.example .env
 ```
 TELEGRAM_BOT_TOKEN=your_telegram_bot_token_here
 MONGODB_URI=mongodb://localhost:27017/simple_bot
+MINIO_ENDPOINT=your_minio_endpoint_here
+MINIO_ACCESS_KEY=your_minio_access_key_here
+MINIO_SECRET_KEY=your_minio_secret_key_here
 ```
 
 5. Chạy bot:
@@ -141,7 +190,10 @@ simple_bot/
 │   └── database.js       # Cấu hình kết nối MongoDB
 ├── models/
 │   ├── Menu.js          # Schema cho thực đơn
-│   └── Order.js         # Schema cho đơn đặt món
+│   ├── Order.js         # Schema cho đơn đặt món
+│   └── Photo.js         # Schema cho ảnh
+├── utils/
+│   └── minioClient.js   # Cấu hình kết nối MinIO
 ├── index.js             # File chính của bot
 ├── package.json
 ├── .env.example
@@ -174,19 +226,34 @@ simple_bot/
 }
 ```
 
+### Photo Schema
+
+```javascript
+{
+  userId: String,    // ID người dùng (cho ảnh cá nhân, có thể null nếu là ảnh nhóm)
+  chatId: String,    // ID của group chat (cho ảnh nhóm, có thể null nếu là ảnh cá nhân)
+  photoName: String, // Tên ảnh
+  url: String        // URL của ảnh trên MinIO
+}
+```
+
 ## Các lệnh bot
 
-| Lệnh                         | Mô tả                                     |
-| ---------------------------- | ----------------------------------------- |
-| `Em gửi thực đơn hôm nay...` | Admin gửi thực đơn                        |
-| `<Tên món>`                  | Đặt món (bất kỳ text nào không phải lệnh) |
-| `/menu`                      | Xem thực đơn hôm nay                      |
-| `/summary`                   | Xem thống kê đặt món hôm nay              |
-| `/reset`                     | Xóa dữ liệu đặt món hôm nay               |
-| `/weeklySummary`             | Xem thống kê đặt món tuần này             |
-| `/monthlySummary`            | Xem thống kê đặt món tháng này            |
-| `/savePhoto <tên>`           | Lưu ảnh với tên chỉ định                  |
-| `/getPhoto <tên>`            | Lấy ảnh đã lưu với tên chỉ định           |
+| Lệnh                                | Mô tả                                     |
+| ----------------------------------- | ----------------------------------------- |
+| `Em gửi thực đơn hôm nay...`        | Admin gửi thực đơn                        |
+| `<Tên món>`                         | Đặt món (bất kỳ text nào không phải lệnh) |
+| `/menu`                             | Xem thực đơn hôm nay                      |
+| `/summary`                          | Xem thống kê đặt món hôm nay              |
+| `/reset`                            | Xóa dữ liệu đặt món hôm nay               |
+| `/weeklySummary`                    | Xem thống kê đặt món tuần này             |
+| `/monthlySummary`                   | Xem thống kê đặt món tháng này            |
+| `/savePhoto <tên>`                  | Lưu ảnh cá nhân với tên chỉ định          |
+| `/getPhoto <tên>`                   | Lấy ảnh cá nhân đã lưu với tên chỉ định   |
+| `/renamePhoto <tên cũ> <tên mới>`   | Đổi tên ảnh cá nhân đã lưu                |
+| `/saveChatImg <tên>`                | Lưu ảnh nhóm với tên chỉ định             |
+| `/getChatImg <tên>`                 | Lấy ảnh nhóm đã lưu với tên chỉ định      |
+| `/renameChatImg <tên cũ> <tên mới>` | Đổi tên ảnh nhóm đã lưu                   |
 
 ## License
 
