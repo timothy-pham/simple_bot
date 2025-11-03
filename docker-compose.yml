@@ -11,7 +11,5 @@ services:
       - .env
     environment:
       - NODE_ENV=production
-    depends_on:
-      - mongodb
     network_mode: myvps
     restart: unless-stopped
