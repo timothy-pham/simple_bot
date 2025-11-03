@@ -307,12 +307,12 @@ bot.onText(/\/help/, (msg) => {
     `/weeklySummary - Thống kê tuần 📆\n` +
     `/monthlySummary - Thống kê tháng 🗓️\n` +
     `/reset - Xoá đơn đặt món hôm nay 🧹\n` +
-    `/savePhoto <tên> - Lưu ảnh với tên chỉ định 📸\n` +
-    `/getPhoto <tên> - Lấy ảnh đã lưu với tên chỉ định 🔍\n` +
-    `/renamePhoto <tên cũ> <tên mới> - Đổi tên ảnh đã lưu 🔄\n` +
-    `/saveChatImg <tên> - Lưu ảnh nhóm với tên chỉ định 📸\n` +
-    `/getChatImg <tên> - Lấy ảnh nhóm đã lưu với tên chỉ định 🔍\n` +
-    `/renameChatImg <tên cũ> <tên mới> - Đổi tên ảnh nhóm 🔄\n\n` +
+    `/savephoto <tên> - Lưu ảnh với tên chỉ định 📸\n` +
+    `/getphoto <tên> - Lấy ảnh đã lưu với tên chỉ định 🔍\n` +
+    `/renamephoto <tên cũ> <tên mới> - Đổi tên ảnh đã lưu 🔄\n` +
+    `/savechatimg <tên> - Lưu ảnh nhóm với tên chỉ định 📸\n` +
+    `/getchatimg <tên> - Lấy ảnh nhóm đã lưu với tên chỉ định 🔍\n` +
+    `/renamechatimg <tên cũ> <tên mới> - Đổi tên ảnh nhóm 🔄\n\n` +
     `💡 Mỗi người chỉ đặt được 1 món/ngày thôi ạ. Nếu đặt lại thì em sẽ tự cập nhật nha ♥️`;
 
   bot.sendMessage(chatId, helpMessage, { parse_mode: 'Markdown' });
@@ -321,8 +321,8 @@ bot.onText(/\/help/, (msg) => {
 const waitingForPhoto = {}; // userId -> photoName
 const waitingForChatImg = {}; // chatId -> photoName
 
-// 💾 Command: /savePhoto momo
-bot.onText(/\/savePhoto (.+)/, async (msg, match) => {
+// 💾 Command: /savephoto momo
+bot.onText(/\/savephoto (.+)/, async (msg, match) => {
   const chatId = msg.chat.id;
   const userId = msg.from.id;
   const photoName = match[1].trim();
@@ -333,8 +333,8 @@ bot.onText(/\/savePhoto (.+)/, async (msg, match) => {
   });
 });
 
-// 💾 Command: /saveChatImg momo
-bot.onText(/\/saveChatImg (.+)/, async (msg, match) => {
+// 💾 Command: /savechatimg momo
+bot.onText(/\/savechatimg (.+)/, async (msg, match) => {
   const chatId = msg.chat.id;
   const photoName = match[1].trim();
 
@@ -403,8 +403,8 @@ bot.on('photo', async (msg) => {
   }
 });
 
-// 🔍 Command: /getPhoto momo
-bot.onText(/\/getPhoto (.+)/, async (msg, match) => {
+// 🔍 Command: /getphoto momo
+bot.onText(/\/getphoto (.+)/, async (msg, match) => {
   const chatId = msg.chat.id;
   const userId = msg.from.id;
   const photoName = match[1].trim();
@@ -420,7 +420,7 @@ bot.onText(/\/getPhoto (.+)/, async (msg, match) => {
     }
 
     bot.sendPhoto(chatId, photoDoc.url, {
-      caption: `📸 Ảnh *${photoName}* của ${msg.from.first_name} nè ạ!`,
+      caption: `📸*${photoName}*`,
       parse_mode: 'Markdown',
     });
   } catch (err) {
@@ -429,8 +429,8 @@ bot.onText(/\/getPhoto (.+)/, async (msg, match) => {
   }
 });
 
-// 🔍 Command: /getChatImg momo
-bot.onText(/\/getChatImg (.+)/, async (msg, match) => {
+// 🔍 Command: /getchatimg momo
+bot.onText(/\/getchatimg (.+)/, async (msg, match) => {
   const chatId = msg.chat.id;
   const photoName = match[1].trim();
 
@@ -445,7 +445,7 @@ bot.onText(/\/getChatImg (.+)/, async (msg, match) => {
     }
 
     bot.sendPhoto(chatId, photoDoc.url, {
-      caption: `📸 Ảnh *${photoName}* của nhóm nè ạ!`,
+      caption: `📸*${photoName}*`,
       parse_mode: 'Markdown',
     });
   } catch (err) {
@@ -454,8 +454,8 @@ bot.onText(/\/getChatImg (.+)/, async (msg, match) => {
   }
 });
 
-// 🔄 Command: /renamePhoto oldName newName
-bot.onText(/\/renamePhoto (.+) (.+)/, async (msg, match) => {
+// 🔄 Command: /renamephoto oldName newName
+bot.onText(/\/renamephoto (.+) (.+)/, async (msg, match) => {
   const chatId = msg.chat.id;
   const userId = msg.from.id;
   const oldName = match[1].trim();
@@ -482,10 +482,8 @@ bot.onText(/\/renamePhoto (.+) (.+)/, async (msg, match) => {
     console.error('Error renaming photo:', err);
     bot.sendMessage(chatId, '⚠️ Dạ em xin lỗi, có lỗi khi đổi tên ảnh ạ!');
   }
-});
-
-// 🔄 Command: /renameChatImg oldName newName
-bot.onText(/\/renameChatImg (.+) (.+)/, async (msg, match) => {
+});// 🔄 Command: /renamechatimg oldName newName
+bot.onText(/\/renamechatimg (.+) (.+)/, async (msg, match) => {
   const chatId = msg.chat.id;
   const oldName = match[1].trim();
   const newName = match[2].trim();

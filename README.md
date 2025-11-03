@@ -66,34 +66,34 @@ Bot hỗ trợ lưu trữ và truy xuất ảnh cá nhân của người dùng.
 
 #### Lưu ảnh cá nhân
 
-Sử dụng lệnh `/savePhoto <tên>` để chuẩn bị lưu ảnh với tên chỉ định, sau đó gửi ảnh vào chat.
+Sử dụng lệnh `/savephoto <tên>` để chuẩn bị lưu ảnh với tên chỉ định, sau đó gửi ảnh vào chat.
 
 **Ví dụ:**
 
 ```
-/savePhoto momo
+/savephoto momo
 ```
 
 Sau đó gửi ảnh QR code hoặc bất kỳ ảnh nào.
 
 #### Lấy ảnh cá nhân
 
-Sử dụng lệnh `/getPhoto <tên>` để lấy ảnh đã lưu với tên chỉ định.
+Sử dụng lệnh `/getphoto <tên>` để lấy ảnh đã lưu với tên chỉ định.
 
 **Ví dụ:**
 
 ```
-/getPhoto momo
+/getphoto momo
 ```
 
 #### Đổi tên ảnh cá nhân
 
-Sử dụng lệnh `/renamePhoto <tên cũ> <tên mới>` để đổi tên ảnh đã lưu.
+Sử dụng lệnh `/renamephoto <tên cũ> <tên mới>` để đổi tên ảnh đã lưu.
 
 **Ví dụ:**
 
 ```
-/renamePhoto momo momo2
+/renamephoto momo momo2
 ```
 
 ### 7. Ảnh nhóm
@@ -102,34 +102,34 @@ Bot hỗ trợ lưu trữ và truy xuất ảnh chia sẻ trong nhóm chat.
 
 #### Lưu ảnh nhóm
 
-Sử dụng lệnh `/saveChatImg <tên>` để chuẩn bị lưu ảnh nhóm với tên chỉ định, sau đó gửi ảnh vào chat.
+Sử dụng lệnh `/savechatimg <tên>` để chuẩn bị lưu ảnh nhóm với tên chỉ định, sau đó gửi ảnh vào chat.
 
 **Ví dụ:**
 
 ```
-/saveChatImg menu
+/savechatimg menu
 ```
 
 Sau đó gửi ảnh thực đơn hoặc bất kỳ ảnh nào.
 
 #### Lấy ảnh nhóm
 
-Sử dụng lệnh `/getChatImg <tên>` để lấy ảnh nhóm đã lưu với tên chỉ định.
+Sử dụng lệnh `/getchatimg <tên>` để lấy ảnh nhóm đã lưu với tên chỉ định.
 
 **Ví dụ:**
 
 ```
-/getChatImg menu
+/getchatimg menu
 ```
 
 #### Đổi tên ảnh nhóm
 
-Sử dụng lệnh `/renameChatImg <tên cũ> <tên mới>` để đổi tên ảnh nhóm đã lưu.
+Sử dụng lệnh `/renamechatimg <tên cũ> <tên mới>` để đổi tên ảnh nhóm đã lưu.
 
 **Ví dụ:**
 
 ```
-/renameChatImg menu menu_today
+/renamechatimg menu menu_today
 ```
 
 ## Cài đặt
@@ -249,12 +249,12 @@ simple_bot/
 | `/reset`                            | Xóa dữ liệu đặt món hôm nay               |
 | `/weeklySummary`                    | Xem thống kê đặt món tuần này             |
 | `/monthlySummary`                   | Xem thống kê đặt món tháng này            |
-| `/savePhoto <tên>`                  | Lưu ảnh cá nhân với tên chỉ định          |
-| `/getPhoto <tên>`                   | Lấy ảnh cá nhân đã lưu với tên chỉ định   |
-| `/renamePhoto <tên cũ> <tên mới>`   | Đổi tên ảnh cá nhân đã lưu                |
-| `/saveChatImg <tên>`                | Lưu ảnh nhóm với tên chỉ định             |
-| `/getChatImg <tên>`                 | Lấy ảnh nhóm đã lưu với tên chỉ định      |
-| `/renameChatImg <tên cũ> <tên mới>` | Đổi tên ảnh nhóm đã lưu                   |
+| `/savephoto <tên>`                  | Lưu ảnh cá nhân với tên chỉ định          |
+| `/getphoto <tên>`                   | Lấy ảnh cá nhân đã lưu với tên chỉ định   |
+| `/renamephoto <tên cũ> <tên mới>`   | Đổi tên ảnh cá nhân đã lưu                |
+| `/savechatimg <tên>`                | Lưu ảnh nhóm với tên chỉ định             |
+| `/getchatimg <tên>`                 | Lấy ảnh nhóm đã lưu với tên chỉ định      |
+| `/renamechatimg <tên cũ> <tên mới>` | Đổi tên ảnh nhóm đã lưu                   |
 
 ## License
 

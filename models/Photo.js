@@ -1,7 +1,8 @@
 const mongoose = require('mongoose');
 
 const PhotoSchema = new mongoose.Schema({
-    userId: { type: String, required: true },
+    userId: { type: String, },
+    chatId: { type: String, },
     photoName: {
         type: String,
         unique: true,
