@@ -5,7 +5,6 @@ const PhotoSchema = new mongoose.Schema({
     chatId: { type: String, },
     photoName: {
         type: String,
-        unique: true,
         required: true
     },
     url: { type: String, required: true },

@@ -309,9 +309,11 @@ bot.onText(/\/help/, (msg) => {
     `/reset - Xoá đơn đặt món hôm nay 🧹\n` +
     `/savephoto <tên> - Lưu ảnh với tên chỉ định 📸\n` +
     `/getphoto <tên> - Lấy ảnh đã lưu với tên chỉ định 🔍\n` +
+    `/allphoto - Xem tất cả tên ảnh của bạn 📸\n` +
     `/renamephoto <tên cũ> <tên mới> - Đổi tên ảnh đã lưu 🔄\n` +
     `/savechatimg <tên> - Lưu ảnh nhóm với tên chỉ định 📸\n` +
     `/getchatimg <tên> - Lấy ảnh nhóm đã lưu với tên chỉ định 🔍\n` +
+    `/allchatimg - Xem tất cả tên ảnh của nhóm 📸\n` +
     `/renamechatimg <tên cũ> <tên mới> - Đổi tên ảnh nhóm 🔄\n\n` +
     `💡 Mỗi người chỉ đặt được 1 món/ngày thôi ạ. Nếu đặt lại thì em sẽ tự cập nhật nha ♥️`;
 
@@ -508,6 +510,55 @@ bot.onText(/\/renamechatimg (.+) (.+)/, async (msg, match) => {
   } catch (err) {
     console.error('Error renaming chat img:', err);
     bot.sendMessage(chatId, '⚠️ Dạ em xin lỗi, có lỗi khi đổi tên ảnh nhóm ạ!');
+  }
+});
+
+// 🔍 Command: /allphoto
+bot.onText(/\/allphoto/, async (msg) => {
+  const chatId = msg.chat.id;
+  const userId = msg.from.id;
+
+  try {
+    const photos = await Photo.find({ userId });
+
+    if (photos.length === 0) {
+      bot.sendMessage(chatId, `📸 Dạ ${msg.from.first_name} ơi, em không thấy ảnh nào của bạn cả ạ!`, {
+        parse_mode: 'Markdown',
+      });
+      return;
+    }
+
+    const photoNames = photos.map(photo => photo.photoName).join(', ');
+    bot.sendMessage(chatId, `📸 Dạ ${msg.from.first_name} ơi, đây là tất cả ảnh của bạn: *${photoNames}*`, {
+      parse_mode: 'Markdown',
+    });
+  } catch (err) {
+    console.error('Error fetching all photos:', err);
+    bot.sendMessage(chatId, '⚠️ Dạ em xin lỗi, có lỗi khi lấy danh sách ảnh ạ!');
+  }
+});
+
+// 🔍 Command: /allchatimg
+bot.onText(/\/allchatimg/, async (msg) => {
+  const chatId = msg.chat.id;
+
+  try {
+    const photos = await Photo.find({ chatId: chatId.toString() });
+
+    if (photos.length === 0) {
+      bot.sendMessage(chatId, '📸 Dạ nhóm ơi, em không thấy ảnh nào của nhóm cả ạ!', {
+        parse_mode: 'Markdown',
+      });
+      return;
+    }
+
+    const photoNames = photos.map(photo => photo.photoName).join(', ');
+    bot.sendMessage(chatId, `📸 Dạ nhóm ơi, đây là tất cả ảnh của nhóm: *${photoNames}*`, {
+      parse_mode: 'Markdown',
+    });
+  } catch (err) {
+    console.error('Error fetching all chat imgs:', err);
+    bot.sendMessage(chatId, '⚠️ Dạ em xin lỗi, có lỗi khi lấy danh sách ảnh nhóm ạ!');
   }
 });
 
