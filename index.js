@@ -3,6 +3,13 @@ const TelegramBot = require('node-telegram-bot-api');
 const connectDB = require('./config/database');
 const Menu = require('./models/Menu');
 const Order = require('./models/Order');
+const Photo = require('./models/Photo');
+const axios = require('axios');
+const path = require('path');
+const mime = require('mime-types');
+const minioClient = require('./utils/minioClient');
+var slugify = require('slugify')
+
 
 // Connect to MongoDB
 connectDB();
@@ -299,10 +306,101 @@ bot.onText(/\/help/, (msg) => {
     `/summary - Thống kê hôm nay 🍱\n` +
     `/weeklySummary - Thống kê tuần 📆\n` +
     `/monthlySummary - Thống kê tháng 🗓️\n` +
-    `/reset - Xoá đơn đặt món hôm nay 🧹\n\n` +
+    `/reset - Xoá đơn đặt món hôm nay 🧹\n` +
+    `/savePhoto <tên> - Lưu ảnh với tên chỉ định 📸\n` +
+    `/getPhoto <tên> - Lấy ảnh đã lưu với tên chỉ định 🔍\n\n` +
     `💡 Mỗi người chỉ đặt được 1 món/ngày thôi ạ. Nếu đặt lại thì em sẽ tự cập nhật nha ♥️`;
 
   bot.sendMessage(chatId, helpMessage, { parse_mode: 'Markdown' });
+});
+
+const waitingForPhoto = {}; // userId -> photoName
+
+// 💾 Command: /savePhoto momo
+bot.onText(/\/savePhoto (.+)/, async (msg, match) => {
+  const chatId = msg.chat.id;
+  const userId = msg.from.id;
+  const photoName = match[1].trim();
+
+  waitingForPhoto[userId] = photoName;
+  bot.sendMessage(chatId, `📸 Dạ ${msg.from.first_name} ơi, gửi ảnh *${photoName}* cho em nha ạ!`, {
+    parse_mode: 'Markdown',
+  });
+});
+
+// 📷 Khi user gửi ảnh
+bot.on('photo', async (msg) => {
+  const chatId = msg.chat.id;
+  const userId = msg.from.id;
+
+  if (!waitingForPhoto[userId]) return;
+
+  const photoName = waitingForPhoto[userId];
+  delete waitingForPhoto[userId]; // clear state
+
+  try {
+    const photo = msg.photo[msg.photo.length - 1]; // ảnh độ phân giải cao nhất
+    const fileId = photo.file_id;
+    const fileLink = await bot.getFileLink(fileId);
+
+    const response = await axios.get(fileLink, { responseType: 'arraybuffer' });
+    const buffer = Buffer.from(response.data);
+
+    const photoNameify = slugify(photoName, { lower: true });
+    const minioPath = `${userId}_${photoNameify}_${Date.now()}.jpg`
+    const metaData = {
+      'Content-Type': mime.lookup(minioPath) || 'image/jpeg',
+      'Content-Disposition': 'inline',
+    };
+
+    // Upload lên MinIO
+    await minioClient.putObject('telebot', minioPath, buffer, metaData);
+
+    // URL public
+    const fileUrl = `https://${process.env.MINIO_ENDPOINT}/telebot/${minioPath}`;
+
+    // Lưu DB, nếu đã có tên thì cập nhật lại url
+    const photoDoc = await Photo.findOneAndUpdate(
+      { userId, photoName },
+      { url: fileUrl },
+      { new: true, upsert: true }
+    );
+
+    bot.sendMessage(chatId, `✅ Em đã lưu ảnh *${photoName}* thành công!\n`, {
+      parse_mode: 'Markdown',
+    });
+
+    console.log(`[Photo SAVED] ${msg.from.first_name} → ${fileUrl}`);
+  } catch (err) {
+    console.error('Error saving QR:', err);
+    bot.sendMessage(chatId, '⚠️ Dạ em xin lỗi, có lỗi khi lưu ảnh QR ạ!');
+  }
+});
+
+// 🔍 Command: /getPhoto momo
+bot.onText(/\/getPhoto (.+)/, async (msg, match) => {
+  const chatId = msg.chat.id;
+  const userId = msg.from.id;
+  const photoName = match[1].trim();
+
+  try {
+    const photoDoc = await Photo.findOne({ userId, photoName });
+
+    if (!photoDoc) {
+      bot.sendMessage(chatId, `❌ Dạ em không tìm thấy ảnh *${photoName}* của ${msg.from.first_name} ạ!`, {
+        parse_mode: 'Markdown',
+      });
+      return;
+    }
+    console.log("photo url:", photoDoc.url)
+    bot.sendPhoto(chatId, photoDoc.url, {
+      caption: `📸 Ảnh *${photoName}* của ${msg.from.first_name} nè ạ!`,
+      parse_mode: 'Markdown',
+    });
+  } catch (err) {
+    console.error('Error fetching photo:', err);
+    bot.sendMessage(chatId, '⚠️ Dạ em xin lỗi, có lỗi khi lấy ảnh ạ!');
+  }
 });
 
 // Error handling
@@ -310,4 +408,4 @@ bot.on('polling_error', (error) => {
   console.error('Polling error:', error);
 });
 
-console.log('Dạ bot đặt món đang chạy rồi ạ 🌸...');
+console.log('Dạ Simple Bot đang chạy rồi ạ 🌸...');

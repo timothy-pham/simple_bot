@@ -59,6 +59,32 @@ Sử dụng lệnh `/weeklySummary` để xem thống kê món ăn trong tuần.
 
 Sử dụng lệnh `/monthlySummary` để xem thống kê món ăn trong tháng.
 
+### 6. Lưu và lấy ảnh
+
+Bot hỗ trợ lưu trữ và truy xuất ảnh cá nhân của người dùng.
+
+#### Lưu ảnh
+
+Sử dụng lệnh `/savePhoto <tên>` để chuẩn bị lưu ảnh với tên chỉ định, sau đó gửi ảnh vào chat.
+
+**Ví dụ:**
+
+```
+/savePhoto momo
+```
+
+Sau đó gửi ảnh QR code hoặc bất kỳ ảnh nào.
+
+#### Lấy ảnh
+
+Sử dụng lệnh `/getPhoto <tên>` để lấy ảnh đã lưu với tên chỉ định.
+
+**Ví dụ:**
+
+```
+/getPhoto momo
+```
+
 ## Cài đặt
 
 ### Yêu cầu
@@ -154,10 +180,13 @@ simple_bot/
 | ---------------------------- | ----------------------------------------- |
 | `Em gửi thực đơn hôm nay...` | Admin gửi thực đơn                        |
 | `<Tên món>`                  | Đặt món (bất kỳ text nào không phải lệnh) |
+| `/menu`                      | Xem thực đơn hôm nay                      |
 | `/summary`                   | Xem thống kê đặt món hôm nay              |
 | `/reset`                     | Xóa dữ liệu đặt món hôm nay               |
 | `/weeklySummary`             | Xem thống kê đặt món tuần này             |
 | `/monthlySummary`            | Xem thống kê đặt món tháng này            |
+| `/savePhoto <tên>`           | Lưu ảnh với tên chỉ định                  |
+| `/getPhoto <tên>`            | Lấy ảnh đã lưu với tên chỉ định           |
 
 ## License
 
