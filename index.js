@@ -5,6 +5,7 @@ const Menu = require('./models/Menu');
 const Order = require('./models/Order');
 const Photo = require('./models/Photo');
 const axios = require('axios');
+const fs = require('fs');
 const path = require('path');
 const mime = require('mime-types');
 const minioClient = require('./utils/minioClient');
@@ -16,6 +17,22 @@ connectDB();
 
 // Create bot instance
 const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: true });
+
+// 1️⃣ Load file chứa từ cấm
+const badWordsPath = path.join(process.cwd(), 'vn_offensive_words.txt');
+const badWords = fs
+  .readFileSync(badWordsPath, 'utf8')
+  .split('\n')
+  .map(line => line.trim().toLowerCase())
+  .filter(line => line && !line.startsWith('#') && !line.startsWith('###'));
+
+console.log(`🚫 Loaded ${badWords.length} bad words.`);
+
+// 2️⃣ Hàm kiểm tra tin nhắn
+function containsBadWord(message) {
+  const normalized = message.toLowerCase().normalize('NFC');
+  return badWords.some(word => normalized.includes(word));
+}
 
 // Helper function to get start and end of today
 const getTodayRange = () => {
@@ -65,7 +82,29 @@ const countDishes = (orders) => {
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
   const text = msg.text;
+  const user = msg.from;
+
   if (!text) return;
+
+  // Kiểm tra xem có nói bậy không
+  if (containsBadWord(text)) {
+    // nếu có thì reply đúng tin nhắn đó cảnh báo và ban 1 phút
+    await bot.sendMessage(
+      chatId,
+      `Câm mồm lại nào ${user.first_name}, nói chuyện lịch sự dúp a @${user.username || user.first_name} 😤`,
+      { reply_to_message_id: msg.message_id }
+    );
+    try {
+      await bot.restrictChatMember(chatId, user.id, {
+        can_send_messages: false,
+        until_date: Math.floor(Date.now() / 1000) + 60 // 1 phút
+      });
+      console.log(`Banned ${user.first_name} for 1 minute for bad language.`);
+    } catch (error) {
+      console.error('Error banning user:', error?.message);
+    }
+    return;
+  }
 
   // Admin gửi menu
   if (text.toLowerCase().startsWith('em gửi thực đơn hôm nay')) {
