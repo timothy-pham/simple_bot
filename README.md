@@ -1,7 +1,7 @@
 # Simple Bot - Telegram Food Ordering And Storage Photo Bot
 
 Bot Telegram đơn giản hỗ trợ đặt cơm hằng ngày trong group, lưu dữ liệu vào MongoDB và thống kê kết quả.
-Ngoài ra còn hỗ trợ lưu trữ và truy xuất hình ảnh theo người dùng.
+Ngoài ra còn hỗ trợ lưu trữ và truy xuất hình ảnh theo người dùng, cùng các tính năng vui như mention toàn bộ thành viên, roast bạn bè, và xem vận may ngẫu nhiên.
 
 ## Tính năng
 
@@ -132,6 +132,62 @@ Sử dụng lệnh `/renamechatimg <tên cũ> <tên mới>` để đổi tên �
 /renamechatimg menu menu_today
 ```
 
+### 8. Tính năng vui
+
+Bot hỗ trợ các tính năng giải trí cho nhóm.
+
+#### /tagall - Mention toàn bộ thành viên
+
+Sử dụng lệnh `/tagall` để mention tối đa 50 thành viên trong nhóm. Bot sẽ tự động lưu thông tin thành viên khi họ gửi tin nhắn trong nhóm.
+
+**Ví dụ:**
+
+```
+/tagall
+```
+
+Bot sẽ gửi tin nhắn mention tất cả thành viên đã từng nhắn tin trong nhóm.
+
+#### /roast - Chửi vui
+
+Sử dụng lệnh `/roast @user` để bot chửi vui một người dùng với câu ngẫu nhiên.
+
+**Ví dụ:**
+
+```
+/roast @username
+/roast (khi reply tin nhắn của ai đó)
+/roast (để roast chính mình)
+```
+
+**Các câu chửi vui mẫu:**
+- "hôm nay lag não à?"
+- "code bug mà tự tin dữ ha!"
+- "sao hôm nay nhìn giống con bug vậy? 🐛"
+
+#### Auto-reply meme
+
+Bot tự động trả lời khi phát hiện các từ khóa đặc biệt:
+
+- "buồn quá" hoặc "buồn" → "Đừng buồn nữa, mai code tiếp 😎"
+- "mệt quá" hoặc "mệt" → "Nghỉ ngơi đi, uống cà phê nào ☕"
+- "stress" hoặc "stress quá" → "Thôi đừng stress nữa, nghỉ ngơi đi 💆"
+
+#### /lucky - Xem vận may
+
+Sử dụng lệnh `/lucky` để xem vận may ngẫu nhiên trong ngày.
+
+**Ví dụ:**
+
+```
+/lucky
+```
+
+Bot sẽ trả lời với một câu may mắn ngẫu nhiên như:
+- "Bạn hôm nay có 87% cơ hội bị QA chửi."
+- "Bạn hôm nay có 92% cơ hội deploy thành công."
+- "Bạn hôm nay có 45% cơ hội code không bug."
+
 ## Cài đặt
 
 ### Yêu cầu
@@ -192,9 +248,12 @@ simple_bot/
 ├── models/
 │   ├── Menu.js          # Schema cho thực đơn
 │   ├── Order.js         # Schema cho đơn đặt món
-│   └── Photo.js         # Schema cho ảnh
+│   ├── Photo.js         # Schema cho ảnh
+│   └── GroupMember.js   # Schema cho thành viên nhóm
 ├── utils/
 │   └── minioClient.js   # Cấu hình kết nối MinIO
+├── data/
+│   └── messages.json    # Dữ liệu cho roast, auto-reply, và lucky
 ├── index.js             # File chính của bot
 ├── package.json
 ├── .env.example
@@ -238,6 +297,19 @@ simple_bot/
 }
 ```
 
+### GroupMember Schema
+
+```javascript
+{
+  userId: String,    // ID người dùng
+  chatId: String,    // ID của group chat
+  username: String,  // Username Telegram
+  firstName: String, // Tên
+  lastName: String,  // Họ
+  lastSeen: Date     // Lần cuối nhắn tin
+}
+```
+
 ## Các lệnh bot
 
 | Lệnh                                | Mô tả                                     |
@@ -255,6 +327,9 @@ simple_bot/
 | `/savechatimg <tên>`                | Lưu ảnh nhóm với tên chỉ định             |
 | `/getchatimg <tên>`                 | Lấy ảnh nhóm đã lưu với tên chỉ định      |
 | `/renamechatimg <tên cũ> <tên mới>` | Đổi tên ảnh nhóm đã lưu                   |
+| `/tagall`                           | Mention toàn bộ thành viên nhóm           |
+| `/roast @user`                      | Chửi vui 1 câu ngẫu nhiên                 |
+| `/lucky`                            | Xem vận may ngẫu nhiên trong ngày         |
 
 ## License
 
