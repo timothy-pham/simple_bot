@@ -26,7 +26,6 @@ const badWords = fs
   .map(line => line.trim().toLowerCase())
   .filter(line => line && !line.startsWith('#') && !line.startsWith('###'));
 
-console.log(`🚫 Loaded ${badWords.length} bad words.`);
 
 // 2️⃣ Hàm kiểm tra tin nhắn
 function containsBadWord(message) {
@@ -91,7 +90,7 @@ bot.on('message', async (msg) => {
     // nếu có thì reply đúng tin nhắn đó cảnh báo và ban 1 phút
     await bot.sendMessage(
       chatId,
-      `Câm mồm lại nào ${user.first_name}, nói chuyện lịch sự dúp a @${user.username || user.first_name} 😤`,
+      `Câm mồm lại nào ${user.first_name} ${user.last_name}, nói chuyện lịch sự dúp a @${user.username || user.first_name} 😤`,
       { reply_to_message_id: msg.message_id }
     );
     try {
@@ -99,7 +98,10 @@ bot.on('message', async (msg) => {
         can_send_messages: false,
         until_date: Math.floor(Date.now() / 1000) + 60 // 1 phút
       });
-      console.log(`Banned ${user.first_name} for 1 minute for bad language.`);
+      await bot.sendMessage(
+        chatId,
+        `Đã khoá mõm ${user.first_name} 1 phút!`,
+      );
     } catch (error) {
       console.error('Error banning user:', error?.message);
     }
