@@ -9,7 +9,7 @@ const axios = require('axios');
 const path = require('path');
 const mime = require('mime-types');
 const minioClient = require('./utils/minioClient');
-var slugify = require('slugify');
+const slugify = require('slugify');
 const fs = require('fs');
 const messages = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'messages.json'), 'utf8'));
 
@@ -27,6 +27,12 @@ const getTodayRange = () => {
   const end = new Date();
   end.setHours(23, 59, 59, 999);
   return { start, end };
+};
+
+// Helper function to escape Markdown special characters
+const escapeMarkdown = (text) => {
+  if (!text) return '';
+  return text.replace(/[_*[\]()~`>#+=|{}.!-]/g, '\\$&');
 };
 
 // Helper function to get start and end of week
@@ -88,12 +94,14 @@ bot.on('message', async (msg) => {
     }
   }
 
-  // Check for auto-reply triggers
-  const lowerText = text.toLowerCase();
-  for (const [trigger, reply] of Object.entries(messages.autoReplies)) {
-    if (lowerText.includes(trigger)) {
-      bot.sendMessage(chatId, reply);
-      break; // Only reply once per message
+  // Check for auto-reply triggers (skip commands)
+  if (!text.startsWith('/')) {
+    const lowerText = text.toLowerCase();
+    for (const [trigger, reply] of Object.entries(messages.autoReplies)) {
+      if (lowerText.includes(trigger)) {
+        bot.sendMessage(chatId, reply);
+        break; // Only reply once per message
+      }
     }
   }
 
@@ -620,7 +628,7 @@ bot.onText(/\/tagall/, async (msg) => {
     // Create mention string
     let mentions = '📢 *Gọi toàn bộ thành viên nè ạ:*\n\n';
     members.forEach(member => {
-      const name = member.firstName + (member.lastName ? ' ' + member.lastName : '');
+      const name = escapeMarkdown(member.firstName + (member.lastName ? ' ' + member.lastName : ''));
       mentions += `[${name}](tg://user?id=${member.userId}) `;
     });
 
@@ -647,7 +655,7 @@ bot.onText(/\/roast(?:\s+@?(\w+))?/, async (msg, match) => {
 
   // Get random roast message
   const roast = messages.roasts[Math.floor(Math.random() * messages.roasts.length)];
-  bot.sendMessage(chatId, `@${targetUsername} ${roast}`, { parse_mode: 'Markdown' });
+  bot.sendMessage(chatId, `@${targetUsername} ${roast}`);
 });
 
 // /lucky command - Random fortune
