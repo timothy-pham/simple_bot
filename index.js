@@ -32,7 +32,8 @@ const getTodayRange = () => {
 // Helper function to escape Markdown special characters
 const escapeMarkdown = (text) => {
   if (!text) return '';
-  return text.replace(/[_*[\]()~`>#+=|{}.!-]/g, '\\$&');
+  // Escape backslash first, then other special characters
+  return text.replace(/\\/g, '\\\\').replace(/[_*[\]()~`>#+=|{}.!-]/g, '\\$&');
 };
 
 // Helper function to get start and end of week
