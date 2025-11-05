@@ -1,21 +1,30 @@
 const mongoose = require('mongoose');
 
-const menuSchema = new mongoose.Schema({
-  text: {
+const menuItemSchema = new mongoose.Schema({
+  name: {
     type: String,
     required: true
   },
-  date: {
-    type: Date,
-    default: Date.now
-  },
+  price: {
+    type: Number,
+    required: true
+  }
+}, { _id: false });
+
+const menuSchema = new mongoose.Schema({
   chatId: {
     type: String,
-    required: true
+    required: true,
+    unique: true
+  },
+  items: [menuItemSchema],
+  updatedAt: {
+    type: Date,
+    default: Date.now
   }
 });
 
-// Index for efficient date-based queries
-menuSchema.index({ date: -1, chatId: 1 });
+// Index for efficient chatId queries
+menuSchema.index({ chatId: 1 });
 
 module.exports = mongoose.model('Menu', menuSchema);
