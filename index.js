@@ -51,6 +51,18 @@ const escapeMarkdown = (text) => {
   return text.replace(/\\/g, '\\\\').replace(/[_*[\]()~`>#+=|{}.!-]/g, '\\$&');
 };
 
+// Helper function to normalize Vietnamese text for flexible matching
+const normalizeVietnamese = (text) => {
+  if (!text) return '';
+  return text
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // Remove diacritics
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'd')
+    .trim();
+};
+
 // Helper function to get start and end of week
 const getWeekRange = () => {
   const now = new Date();
@@ -123,43 +135,77 @@ bot.on('message', async (msg) => {
     }
   }
 
-  // Admin gửi menu
-  if (text.toLowerCase().startsWith('em gửi thực đơn hôm nay')) {
+  // Handle menu input (if waiting for menu)
+  if (waitingForMenu[chatId] && !text.startsWith('/')) {
+    delete waitingForMenu[chatId];
+    
     try {
-      const menu = new Menu({
-        text: text,
-        chatId: chatId.toString()
+      // Parse menu items from the input
+      // Expected format: "1. Cafe sữa - 15000\n2. Trà tắc - 18000"
+      const lines = text.split('\n').filter(line => line.trim());
+      const menuItems = [];
+      
+      for (const line of lines) {
+        // Match format: "1. Cafe sữa - 15000" or "Cafe sữa - 15000"
+        const match = line.match(/(?:\d+\.\s*)?(.+?)\s*-\s*(\d+)/);
+        if (match) {
+          const name = match[1].trim();
+          const price = parseInt(match[2]);
+          menuItems.push({ name, price });
+        }
+      }
+      
+      if (menuItems.length === 0) {
+        bot.sendMessage(chatId, '⚠️ Dạ em xin lỗi, em không hiểu định dạng menu ạ! Vui lòng gửi theo mẫu:\n1. Cafe sữa - 15000\n2. Trà tắc - 18000');
+        return;
+      }
+      
+      // Save or update menu
+      await Menu.findOneAndUpdate(
+        { chatId: chatId.toString() },
+        { 
+          items: menuItems,
+          updatedAt: new Date()
+        },
+        { upsert: true, new: true }
+      );
+      
+      let confirmMsg = '🌸 Dạ em đã lưu menu rồi ạ! Menu hiện tại:\n\n';
+      menuItems.forEach((item, idx) => {
+        confirmMsg += `${idx + 1}. ${item.name} - ${item.price.toLocaleString('vi-VN')}đ\n`;
       });
-      await menu.save();
-      bot.sendMessage(chatId, '🌸 Dạ em đã lưu thực đơn hôm nay rồi ạ!');
+      
+      bot.sendMessage(chatId, confirmMsg);
     } catch (error) {
       console.error('Error saving menu:', error);
-      bot.sendMessage(chatId, '⚠️ Dạ em xin lỗi, có lỗi khi lưu thực đơn ạ!');
+      bot.sendMessage(chatId, '⚠️ Dạ em xin lỗi, có lỗi khi lưu menu ạ!');
     }
+    return;
   }
 
   // Thành viên đặt món
-  else if (!text.startsWith('/')) {
+  if (!text.startsWith('/')) {
     try {
       const { start, end } = getTodayRange();
       const userId = msg.from.id.toString();
       const userName = msg.from.first_name + (msg.from.last_name ? ' ' + msg.from.last_name : '');
 
-      const todayMenu = await Menu.findOne({
-        chatId: chatId.toString(),
-        date: { $gte: start, $lte: end }
+      const menu = await Menu.findOne({
+        chatId: chatId.toString()
       });
 
-      if (!todayMenu) return;
+      if (!menu || menu.items.length === 0) return;
 
-      const menuItems = todayMenu.text
-        .split('\n')
-        .map(line => line.replace(/^[-•]\s*/, '').trim())
-        .filter(line => line && !line.toLowerCase().includes('thực đơn'));
+      // Normalize user input for flexible matching
+      const normalizedInput = normalizeVietnamese(text);
+      
+      // Find matching dish (case-insensitive, diacritic-insensitive)
+      const matchedItem = menu.items.find(item => {
+        const normalizedDishName = normalizeVietnamese(item.name);
+        return normalizedInput.includes(normalizedDishName);
+      });
 
-      const matchedDish = menuItems.find(item => text.toLowerCase().includes(item.toLowerCase()));
-
-      if (!matchedDish) return;
+      if (!matchedItem) return;
 
       const existingOrder = await Order.findOne({
         userId: userId,
@@ -168,20 +214,20 @@ bot.on('message', async (msg) => {
       });
 
       if (existingOrder) {
-        existingOrder.dish = matchedDish;
+        existingOrder.dish = matchedItem.name;
         existingOrder.createdAt = new Date();
         await existingOrder.save();
-        bot.sendMessage(chatId, `🍱 Dạ ${userName} ơi, em đã *cập nhật* món mới là: ${matchedDish} nha ạ ♥️`, { parse_mode: 'Markdown' });
+        bot.sendMessage(chatId, `🍱 Dạ ${userName} ơi, em đã *cập nhật* món mới là: ${matchedItem.name} nha ạ ♥️`, { parse_mode: 'Markdown' });
       } else {
         const order = new Order({
           userId: userId,
           userName: userName,
           chatId: chatId.toString(),
-          dish: matchedDish,
+          dish: matchedItem.name,
           date: new Date()
         });
         await order.save();
-        bot.sendMessage(chatId, `🍱 Dạ ${userName} đã đặt món *${matchedDish}* thành công rồi ạ ♥️`, { parse_mode: 'Markdown' });
+        bot.sendMessage(chatId, `🍱 Dạ ${userName} đã đặt món *${matchedItem.name}* thành công rồi ạ ♥️`, { parse_mode: 'Markdown' });
       }
     } catch (error) {
       console.error('Error saving order:', error);
@@ -313,22 +359,33 @@ bot.onText(/\/menu/, async (msg) => {
   const chatId = msg.chat.id;
 
   try {
-    const { start, end } = getTodayRange();
-    const todayMenu = await Menu.findOne({
-      chatId: chatId.toString(),
-      date: { $gte: start, $lte: end }
+    const menu = await Menu.findOne({
+      chatId: chatId.toString()
     });
 
-    if (!todayMenu) {
-      bot.sendMessage(chatId, '🍽 Dạ hôm nay chưa có thực đơn nào hết ạ!');
+    if (!menu || menu.items.length === 0) {
+      bot.sendMessage(chatId, '🍽 Dạ chưa có thực đơn nào hết ạ! Dùng /savemenu để tạo menu nha ạ!');
       return;
     }
 
-    bot.sendMessage(chatId, `🍽 *Thực đơn hôm nay nè ạ:*\n\n${todayMenu.text}`, { parse_mode: 'Markdown' });
+    let menuText = '🍽 *Thực đơn hiện tại nè ạ:*\n\n';
+    menu.items.forEach((item, idx) => {
+      menuText += `${idx + 1}. ${item.name} - ${item.price.toLocaleString('vi-VN')}đ\n`;
+    });
+
+    bot.sendMessage(chatId, menuText, { parse_mode: 'Markdown' });
   } catch (error) {
     console.error('Error getting menu:', error);
     bot.sendMessage(chatId, '⚠️ Dạ em xin lỗi, có lỗi khi lấy thực đơn ạ!');
   }
+});
+
+// /savemenu command
+bot.onText(/\/savemenu/, async (msg) => {
+  const chatId = msg.chat.id;
+  
+  waitingForMenu[chatId] = true;
+  bot.sendMessage(chatId, '📝 Hãy gửi cho em menu ạ!\n\nVí dụ:\n1. Cafe sữa - 15000\n2. Trà tắc - 18000');
 });
 
 // /start command
@@ -350,15 +407,18 @@ bot.onText(/\/help/, (msg) => {
   const helpMessage =
     `📖 *Hướng dẫn sử dụng bot đặt món dễ thương nè ạ:*\n\n` +
     `🍚 *Đặt món:*\n` +
-    `Chỉ cần gửi tên món ăn có trong thực đơn hôm nay thôi ạ.\n` +
-    `Ví dụ: Cơm gà, Phở bò...\n\n` +
-    `👩‍🍳 *Admin đăng thực đơn:* \n` +
-    `Soạn tin: "Em gửi thực đơn hôm nay..." kèm danh sách món nha ạ.\n` +
-    `- Món 1\n- Món 2\n- Món 3\n\n` +
+    `Chỉ cần gửi tên món ăn có trong menu thôi ạ.\n` +
+    `Ví dụ: "Cafe sữa", "Cho 1 trà tắc", "tra tac"...\n\n` +
+    `👩‍🍳 *Admin lưu menu:* \n` +
+    `Dùng lệnh /savemenu, sau đó gửi menu theo định dạng:\n` +
+    `1. Cafe sữa - 15000\n` +
+    `2. Trà tắc - 18000\n` +
+    `Menu sẽ được lưu vĩnh viễn cho đến khi cập nhật lại nha ạ.\n\n` +
     `💬 *Các lệnh hỗ trợ:* \n` +
     `/start - Bắt đầu làm quen với em nè 💖\n` +
     `/help - Xem lại hướng dẫn sử dụng 📖\n` +
-    `/menu - Xem thực đơn hôm nay 🍽\n` +
+    `/savemenu - Lưu/cập nhật menu 📝\n` +
+    `/menu - Xem menu hiện tại 🍽\n` +
     `/summary - Thống kê hôm nay 🍱\n` +
     `/weeklySummary - Thống kê tuần 📆\n` +
     `/monthlySummary - Thống kê tháng 🗓️\n` +
@@ -383,6 +443,7 @@ bot.onText(/\/help/, (msg) => {
 
 const waitingForPhoto = {}; // userId -> photoName
 const waitingForChatImg = {}; // chatId -> photoName
+const waitingForMenu = {}; // chatId -> true (waiting for menu input)
 
 // 💾 Command: /savephoto momo
 bot.onText(/\/savephoto (.+)/, async (msg, match) => {
