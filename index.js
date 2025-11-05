@@ -6,6 +6,7 @@ const Order = require('./models/Order');
 const Photo = require('./models/Photo');
 const GroupMember = require('./models/GroupMember');
 const axios = require('axios');
+const fs = require('fs');
 const path = require('path');
 const mime = require('mime-types');
 const minioClient = require('./utils/minioClient');
@@ -19,6 +20,21 @@ connectDB();
 
 // Create bot instance
 const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: true });
+
+// 1️⃣ Load file chứa từ cấm
+const badWordsPath = path.join(process.cwd(), 'vn_offensive_words.txt');
+const badWords = fs
+  .readFileSync(badWordsPath, 'utf8')
+  .split('\n')
+  .map(line => line.trim().toLowerCase())
+  .filter(line => line && !line.startsWith('#') && !line.startsWith('###'));
+
+
+// 2️⃣ Hàm kiểm tra tin nhắn
+function containsBadWord(message) {
+  const normalized = message.toLowerCase().normalize('NFC');
+  return badWords.some(word => normalized.includes(word));
+}
 
 // Helper function to get start and end of today
 const getTodayRange = () => {
@@ -75,6 +91,8 @@ const countDishes = (orders) => {
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
   const text = msg.text;
+  const user = msg.from;
+
   if (!text) return;
 
   // Save group member info (for /tagall feature)
