@@ -4,12 +4,15 @@ const connectDB = require('./config/database');
 const Menu = require('./models/Menu');
 const Order = require('./models/Order');
 const Photo = require('./models/Photo');
+const GroupMember = require('./models/GroupMember');
 const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
 const mime = require('mime-types');
 const minioClient = require('./utils/minioClient');
-var slugify = require('slugify')
+const slugify = require('slugify');
+const fs = require('fs');
+const messages = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'messages.json'), 'utf8'));
 
 
 // Connect to MongoDB
@@ -40,6 +43,13 @@ const getTodayRange = () => {
   const end = new Date();
   end.setHours(23, 59, 59, 999);
   return { start, end };
+};
+
+// Helper function to escape Markdown special characters
+const escapeMarkdown = (text) => {
+  if (!text) return '';
+  // Escape backslash first, then other special characters
+  return text.replace(/\\/g, '\\\\').replace(/[_*[\]()~`>#+=|{}.!-]/g, '\\$&');
 };
 
 // Helper function to get start and end of week
@@ -85,27 +95,33 @@ bot.on('message', async (msg) => {
 
   if (!text) return;
 
-  // Kiểm tra xem có nói bậy không
-  if (containsBadWord(text)) {
-    // nếu có thì reply đúng tin nhắn đó cảnh báo và ban 1 phút
-    await bot.sendMessage(
-      chatId,
-      `Câm mồm lại nào ${user.first_name} ${user.last_name}, nói chuyện lịch sự dúp a @${user.username || user.first_name} 😤`,
-      { reply_to_message_id: msg.message_id }
-    );
+  // Save group member info (for /tagall feature)
+  if (msg.chat.type === 'group' || msg.chat.type === 'supergroup') {
     try {
-      await bot.restrictChatMember(chatId, user.id, {
-        can_send_messages: false,
-        until_date: Math.floor(Date.now() / 1000) + 60 // 1 phút
-      });
-      await bot.sendMessage(
-        chatId,
-        `Đã khoá mõm ${user.first_name} 1 phút!`,
+      await GroupMember.findOneAndUpdate(
+        { userId: msg.from.id.toString(), chatId: chatId.toString() },
+        {
+          username: msg.from.username,
+          firstName: msg.from.first_name,
+          lastName: msg.from.last_name,
+          lastSeen: new Date()
+        },
+        { upsert: true, new: true }
       );
     } catch (error) {
-      console.error('Error banning user:', error?.message);
+      console.error('Error saving group member:', error);
     }
-    return;
+  }
+
+  // Check for auto-reply triggers (skip commands)
+  if (!text.startsWith('/')) {
+    const lowerText = text.toLowerCase();
+    for (const [trigger, reply] of Object.entries(messages.autoReplies)) {
+      if (lowerText.includes(trigger)) {
+        bot.sendMessage(chatId, reply);
+        break; // Only reply once per message
+      }
+    }
   }
 
   // Admin gửi menu
@@ -356,7 +372,12 @@ bot.onText(/\/help/, (msg) => {
     `/getchatimg <tên> - Lấy ảnh nhóm đã lưu với tên chỉ định 🔍\n` +
     `/allchatimg - Xem tất cả tên ảnh của nhóm 📸\n` +
     `/renamechatimg <tên cũ> <tên mới> - Đổi tên ảnh nhóm 🔄\n\n` +
+    `🎉 *Tính năng vui:* \n` +
+    `/tagall - Mention toàn bộ thành viên nhóm 📢\n` +
+    `/roast @user - Chửi vui 1 câu ngẫu nhiên 🤣\n` +
+    `/lucky - Xem vận may hôm nay 🎰\n\n` +
     `💡 Mỗi người chỉ đặt được 1 món/ngày thôi ạ. Nếu đặt lại thì em sẽ tự cập nhật nha ♥️`;
+
 
   bot.sendMessage(chatId, helpMessage, { parse_mode: 'Markdown' });
 });
@@ -601,6 +622,72 @@ bot.onText(/\/allchatimg/, async (msg) => {
     console.error('Error fetching all chat imgs:', err);
     bot.sendMessage(chatId, '⚠️ Dạ em xin lỗi, có lỗi khi lấy danh sách ảnh nhóm ạ!');
   }
+});
+
+// /tagall command - Mention all group members
+bot.onText(/\/tagall/, async (msg) => {
+  const chatId = msg.chat.id;
+
+  // Only work in groups
+  if (msg.chat.type !== 'group' && msg.chat.type !== 'supergroup') {
+    bot.sendMessage(chatId, '⚠️ Dạ lệnh này chỉ dùng trong nhóm thôi ạ!');
+    return;
+  }
+
+  try {
+    const members = await GroupMember.find({ chatId: chatId.toString() })
+      .sort({ lastSeen: -1 })
+      .limit(50);
+
+    if (members.length === 0) {
+      bot.sendMessage(chatId, '📋 Dạ em chưa thấy thành viên nào trong nhóm cả ạ!');
+      return;
+    }
+
+    // Create mention string
+    let mentions = '📢 *Gọi toàn bộ thành viên nè ạ:*\n\n';
+    members.forEach(member => {
+      const name = escapeMarkdown(member.firstName + (member.lastName ? ' ' + member.lastName : ''));
+      mentions += `[${name}](tg://user?id=${member.userId}) `;
+    });
+
+    bot.sendMessage(chatId, mentions, { parse_mode: 'Markdown' });
+  } catch (error) {
+    console.error('Error in /tagall:', error);
+    bot.sendMessage(chatId, '⚠️ Dạ em xin lỗi, có lỗi khi tag mọi người ạ!');
+  }
+});
+
+// /roast command - Roast a user
+bot.onText(/\/roast(?:\s+@?(\w+))?/, async (msg, match) => {
+  const chatId = msg.chat.id;
+  let targetUsername = match[1];
+
+  // If no username provided and it's a reply, roast the replied user
+  if (!targetUsername && msg.reply_to_message) {
+    const targetUser = msg.reply_to_message.from;
+    targetUsername = targetUser.username || targetUser.first_name;
+  } else if (!targetUsername) {
+    // Roast the sender if no target specified
+    targetUsername = msg.from.username || msg.from.first_name;
+  }
+
+  // Get random roast message
+  const roast = messages.roasts[Math.floor(Math.random() * messages.roasts.length)];
+  bot.sendMessage(chatId, `@${targetUsername} ${roast}`);
+});
+
+// /lucky command - Random fortune
+bot.onText(/\/lucky/, (msg) => {
+  const chatId = msg.chat.id;
+  const userName = msg.from.first_name;
+
+  // Get random lucky message and random percentage
+  const luckyTemplate = messages.luckyMessages[Math.floor(Math.random() * messages.luckyMessages.length)];
+  const percent = Math.floor(Math.random() * 100) + 1;
+  const luckyMessage = luckyTemplate.replace('{percent}', percent);
+
+  bot.sendMessage(chatId, `🎰 *${userName}:* ${luckyMessage}`, { parse_mode: 'Markdown' });
 });
 
 // Error handling
