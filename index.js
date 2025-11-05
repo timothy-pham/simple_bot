@@ -11,7 +11,6 @@ const path = require('path');
 const mime = require('mime-types');
 const minioClient = require('./utils/minioClient');
 const slugify = require('slugify');
-const fs = require('fs');
 const messages = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'messages.json'), 'utf8'));
 
 
