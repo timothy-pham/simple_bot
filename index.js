@@ -26,13 +26,25 @@ const badWords = fs
   .readFileSync(badWordsPath, 'utf8')
   .split('\n')
   .map(line => line.trim().toLowerCase())
-  .filter(line => line && !line.startsWith('#') && !line.startsWith('###'));
+  .filter(line => line && !line.startsWith('#') && !line.startsWith('###'))
+  .map(word => escapeRegex(word));
 
+function escapeRegex(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
 
-// 2️⃣ Hàm kiểm tra tin nhắn
 function containsBadWord(message) {
   const normalized = message.toLowerCase().normalize('NFC');
-  return badWords.some(word => normalized.includes(word));
+  // Tạo regex ranh giới từ \b hoặc khoảng trắng
+  const regex = new RegExp(`(^|\\s|\\W)(${badWords.join('|')})(?=$|\\s|\\W)`, 'i');
+  return regex.test(normalized);
+}
+
+function getBadWordsInMessage(message) {
+  const normalized = message.toLowerCase().normalize('NFC');
+  const regex = new RegExp(`(^|\\s|\\W)(${badWords.join('|')})(?=$|\\s|\\W)`, 'gi');
+  const matches = [...normalized.matchAll(regex)];
+  return matches.map(m => m[2]);
 }
 
 // Helper function to get start and end of today
@@ -109,10 +121,11 @@ bot.on('message', async (msg) => {
   // Check for bad words
   if (containsBadWord(text)) {
     try {
+      const badWordsInMessage = getBadWordsInMessage(text);
       // ⚠️ Cảnh báo
       await bot.sendMessage(
         chatId,
-        `🚫 <b>Cảnh báo</b>: Không nói bậy, chửi tục! Khoá mõm 1 phút!`,
+        `🚫 <b>Cảnh báo</b>: Không nói bậy, chửi tục! Khoá mõm 1 phút! Từ chửi bậy: ${badWordsInMessage.join(', ')}`,
         {
           parse_mode: 'HTML',
           reply_to_message_id: msg.message_id, // reply đúng tin nhắn đó
