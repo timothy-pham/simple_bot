@@ -5,6 +5,7 @@ services:
   bot:
     build: .
     container_name: simple_bot_app
+    image: simple_bot_image:latest
     ports:
       - "3052:3052"
     env_file:
