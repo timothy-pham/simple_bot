@@ -122,15 +122,18 @@ bot.on('message', async (msg) => {
   if (containsBadWord(text)) {
     try {
       const badWordsInMessage = getBadWordsInMessage(text);
-      // ⚠️ Cảnh báo
-      await bot.sendMessage(
-        chatId,
-        `🚫 <b>Cảnh báo</b>: Không nói bậy, chửi tục!!! Từ chửi bậy: ${badWordsInMessage.join(', ')}`,
-        {
-          parse_mode: 'HTML',
-          reply_to_message_id: msg.message_id, // reply đúng tin nhắn đó
-        }
-      );
+      // Thả cảm xúc phẫn nộ vào tin nhắn
+      await bot.setMessageReaction(chatId, msg.message_id, { reaction: [{ type: 'emoji', emoji: '😡' }] });
+
+
+      // await bot.sendMessage(
+      //   chatId,
+      //   `🚫 <b>Cảnh báo</b>: Không nói bậy, chửi tục!!! Từ chửi bậy: ${badWordsInMessage.join(', ')}`,
+      //   {
+      //     parse_mode: 'HTML',
+      //     reply_to_message_id: msg.message_id, // reply đúng tin nhắn đó
+      //   }
+      // );
       // ⏳ Ban user 1 phút
       // await bot.restrictChatMember(chatId, user.id, {
       //   can_send_messages: false,
