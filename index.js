@@ -125,20 +125,20 @@ bot.on('message', async (msg) => {
       // ⚠️ Cảnh báo
       await bot.sendMessage(
         chatId,
-        `🚫 <b>Cảnh báo</b>: Không nói bậy, chửi tục! Khoá mõm 1 phút! Từ chửi bậy: ${badWordsInMessage.join(', ')}`,
+        `🚫 <b>Cảnh báo</b>: Không nói bậy, chửi tục!!! Từ chửi bậy: ${badWordsInMessage.join(', ')}`,
         {
           parse_mode: 'HTML',
           reply_to_message_id: msg.message_id, // reply đúng tin nhắn đó
         }
       );
       // ⏳ Ban user 1 phút
-      await bot.restrictChatMember(chatId, user.id, {
-        can_send_messages: false,
-        can_send_media_messages: false,
-        can_send_polls: false,
-        can_send_other_messages: false,
-        until_date: Math.floor(Date.now() / 1000) + 60, // 1 phút
-      });
+      // await bot.restrictChatMember(chatId, user.id, {
+      //   can_send_messages: false,
+      //   can_send_media_messages: false,
+      //   can_send_polls: false,
+      //   can_send_other_messages: false,
+      //   until_date: Math.floor(Date.now() / 1000) + 60, // 1 phút
+      // });
 
 
     } catch (err) {
