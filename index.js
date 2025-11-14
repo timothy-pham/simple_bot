@@ -852,7 +852,7 @@ const ai = new GoogleGenAI({
 bot.onText(/\/ai (.+)/, async (msg, match) => {
   const chatId = msg.chat.id;
   const userName = msg.from.first_name + (msg.from.last_name ? ' ' + msg.from.last_name : '');
-  const prompt = `from: ${userName}\nquestion: ${msg.text}\nanswer with cute and polite tone.`;
+  const prompt = `from: ${userName}\nquestion: ${msg.text}\nanswer with cheeky and intimate like old friends tone`;
 
   try {
     const aiResponse = await ai.models.generateContent({
