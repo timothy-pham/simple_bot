@@ -11,6 +11,7 @@ const path = require('path');
 const mime = require('mime-types');
 const minioClient = require('./utils/minioClient');
 const slugify = require('slugify');
+const { GoogleGenAI } = require('@google/genai');
 const messages = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'messages.json'), 'utf8'));
 
 
@@ -840,6 +841,29 @@ bot.onText(/\/lucky/, (msg) => {
   const luckyMessage = luckyTemplate.replace('{percent}', percent);
 
   bot.sendMessage(chatId, `🎰 *${userName}:* ${luckyMessage}`, { parse_mode: 'Markdown' });
+});
+
+const ai = new GoogleGenAI({
+  GEMINI_API_KEY: process.env.GOOGLE_API_KEY,
+});
+
+
+// /ai command - AI chat response
+bot.onText(/\/ai (.+)/, async (msg, match) => {
+  const chatId = msg.chat.id;
+  const userName = msg.from.first_name + (msg.from.last_name ? ' ' + msg.from.last_name : '');
+  const prompt = `from: ${userName}\nquestion: ${msg.text}\nanswer with cute and polite tone.`;
+
+  try {
+    const aiResponse = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: prompt,
+    });
+    bot.sendMessage(chatId, `${aiResponse.text}`, { parse_mode: 'Markdown' });
+  } catch (error) {
+    console.error('Error getting AI response:', error);
+    bot.sendMessage(chatId, '⚠️ Dạ em xin lỗi, có lỗi khi lấy phản hồi từ AI ạ!');
+  }
 });
 
 // Error handling
