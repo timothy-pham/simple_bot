@@ -216,7 +216,7 @@ bot.on('message', async (msg) => {
 
       let confirmMsg = '🌸 Dạ em đã lưu menu rồi ạ! Menu hiện tại:\n\n';
       menuItems.forEach((item, idx) => {
-        confirmMsg += `${idx + 1}. ${item.name} - ${item.price.toLocaleString('vi-VN')}đ\n`;
+        confirmMsg += `${idx + 1}. ${escapeMarkdown(item.name)} - ${item.price.toLocaleString('vi-VN')}đ\n`;
       });
 
       bot.sendMessage(chatId, confirmMsg);
@@ -277,7 +277,7 @@ bot.on('message', async (msg) => {
         await existingOrder.save();
         bot.sendMessage(
           chatId,
-          `🍱 Dạ ${userName} ơi, em đã *cập nhật* món mới là: ${bestMatch.name} nha ạ ♥️`,
+          `🍱 Dạ ${escapeMarkdown(userName)} ơi, em đã *cập nhật* món mới là: ${escapeMarkdown(bestMatch.name)} nha ạ ♥️`,
           { parse_mode: 'Markdown' }
         );
       } else {
@@ -291,7 +291,7 @@ bot.on('message', async (msg) => {
         await order.save();
         bot.sendMessage(
           chatId,
-          `🍱 Dạ ${userName} đã đặt món *${bestMatch.name}* thành công rồi ạ ♥️`,
+          `🍱 Dạ ${escapeMarkdown(userName)} đã đặt món *${escapeMarkdown(bestMatch.name)}* thành công rồi ạ ♥️`,
           { parse_mode: 'Markdown' }
         );
       }
@@ -331,8 +331,8 @@ bot.onText(/\/summary/, async (msg) => {
 
     let message = '📊 *Thống kê đặt món hôm nay nè ạ:*\n\n';
     Object.keys(dishCount).forEach(dish => {
-      message += `🍽 *${dish}*: ${dishCount[dish].count} phần\n`;
-      message += `   └ ${dishCount[dish].users.join(', ')}\n\n`;
+      message += `🍽 *${escapeMarkdown(dish)}*: ${dishCount[dish].count} phần\n`;
+      message += `   └ ${dishCount[dish].users.map(u => escapeMarkdown(u)).join(', ')}\n\n`;
     });
     message += `📝 Tổng cộng: ${orders.length} phần`;
 
@@ -405,7 +405,7 @@ bot.onText(/\/weeklySummary/, async (msg) => {
     const dishCount = countDishes(orders);
     let message = '📊 *Thống kê đặt món tuần này nè ạ:*\n\n';
     Object.keys(dishCount).sort((a, b) => dishCount[b] - dishCount[a]).forEach(dish => {
-      message += `🍽 *${dish}*: ${dishCount[dish]} phần\n`;
+      message += `🍽 *${escapeMarkdown(dish)}*: ${dishCount[dish]} phần\n`;
     });
     message += `\n📝 Tổng cộng: ${orders.length} phần`;
 
@@ -435,7 +435,7 @@ bot.onText(/\/monthlySummary/, async (msg) => {
     const dishCount = countDishes(orders);
     let message = '📊 *Thống kê đặt món tháng này nè ạ:*\n\n';
     Object.keys(dishCount).sort((a, b) => dishCount[b] - dishCount[a]).forEach(dish => {
-      message += `🍽 *${dish}*: ${dishCount[dish]} phần\n`;
+      message += `🍽 *${escapeMarkdown(dish)}*: ${dishCount[dish]} phần\n`;
     });
     message += `\n📝 Tổng cộng: ${orders.length} phần`;
 
@@ -462,7 +462,7 @@ bot.onText(/\/menu/, async (msg) => {
 
     let menuText = '🍽 *Thực đơn hiện tại nè ạ:*\n\n';
     menu.items.forEach((item, idx) => {
-      menuText += `${idx + 1}. ${item.name} - ${item.price.toLocaleString('vi-VN')}đ\n`;
+      menuText += `${idx + 1}. ${escapeMarkdown(item.name)} - ${item.price.toLocaleString('vi-VN')}đ\n`;
     });
 
     bot.sendMessage(chatId, menuText, { parse_mode: 'Markdown' });
@@ -545,7 +545,7 @@ bot.onText(/\/savephoto (.+)/, async (msg, match) => {
   const photoName = match[1].trim();
 
   waitingForPhoto[userId] = photoName;
-  bot.sendMessage(chatId, `📸 Dạ ${msg.from.first_name} ơi, gửi ảnh *${photoName}* cho em nha ạ!`, {
+  bot.sendMessage(chatId, `📸 Dạ ${escapeMarkdown(msg.from.first_name)} ơi, gửi ảnh *${escapeMarkdown(photoName)}* cho em nha ạ!`, {
     parse_mode: 'Markdown',
   });
 });
@@ -556,7 +556,7 @@ bot.onText(/\/savechatimg (.+)/, async (msg, match) => {
   const photoName = match[1].trim();
 
   waitingForChatImg[chatId] = photoName;
-  bot.sendMessage(chatId, `📸 Dạ nhóm ơi, gửi ảnh *${photoName}* cho em nha ạ!`, {
+  bot.sendMessage(chatId, `📸 Dạ nhóm ơi, gửi ảnh *${escapeMarkdown(photoName)}* cho em nha ạ!`, {
     parse_mode: 'Markdown',
   });
 });
@@ -609,7 +609,7 @@ bot.on('photo', async (msg) => {
       { new: true, upsert: true }
     );
 
-    bot.sendMessage(chatId, `✅ Em đã lưu ảnh *${photoName}* thành công!\n`, {
+    bot.sendMessage(chatId, `✅ Em đã lưu ảnh *${escapeMarkdown(photoName)}* thành công!\n`, {
       parse_mode: 'Markdown',
     });
 
@@ -630,14 +630,14 @@ bot.onText(/\/getphoto (.+)/, async (msg, match) => {
     const photoDoc = await Photo.findOne({ userId, photoName });
 
     if (!photoDoc) {
-      bot.sendMessage(chatId, `❌ Dạ em không tìm thấy ảnh *${photoName}* của ${msg.from.first_name} ạ!`, {
+      bot.sendMessage(chatId, `❌ Dạ em không tìm thấy ảnh *${escapeMarkdown(photoName)}* của ${escapeMarkdown(msg.from.first_name)} ạ!`, {
         parse_mode: 'Markdown',
       });
       return;
     }
 
     bot.sendPhoto(chatId, photoDoc.url, {
-      caption: `📸*${photoName}*`,
+      caption: `📸*${escapeMarkdown(photoName)}*`,
       parse_mode: 'Markdown',
     });
   } catch (err) {
@@ -655,14 +655,14 @@ bot.onText(/\/getchatimg (.+)/, async (msg, match) => {
     const photoDoc = await Photo.findOne({ chatId: chatId.toString(), photoName });
 
     if (!photoDoc) {
-      bot.sendMessage(chatId, `❌ Dạ em không tìm thấy ảnh *${photoName}* của nhóm ạ!`, {
+      bot.sendMessage(chatId, `❌ Dạ em không tìm thấy ảnh *${escapeMarkdown(photoName)}* của nhóm ạ!`, {
         parse_mode: 'Markdown',
       });
       return;
     }
 
     bot.sendPhoto(chatId, photoDoc.url, {
-      caption: `📸*${photoName}*`,
+      caption: `📸*${escapeMarkdown(photoName)}*`,
       parse_mode: 'Markdown',
     });
   } catch (err) {
@@ -686,13 +686,13 @@ bot.onText(/\/renamephoto (.+) (.+)/, async (msg, match) => {
     );
 
     if (!photoDoc) {
-      bot.sendMessage(chatId, `❌ Dạ em không tìm thấy ảnh *${oldName}* của ${msg.from.first_name} để đổi tên ạ!`, {
+      bot.sendMessage(chatId, `❌ Dạ em không tìm thấy ảnh *${escapeMarkdown(oldName)}* của ${escapeMarkdown(msg.from.first_name)} để đổi tên ạ!`, {
         parse_mode: 'Markdown',
       });
       return;
     }
 
-    bot.sendMessage(chatId, `✅ Dạ em đã đổi tên ảnh từ *${oldName}* thành *${newName}* rồi ạ!`, {
+    bot.sendMessage(chatId, `✅ Dạ em đã đổi tên ảnh từ *${escapeMarkdown(oldName)}* thành *${escapeMarkdown(newName)}* rồi ạ!`, {
       parse_mode: 'Markdown',
     });
   } catch (err) {
@@ -713,13 +713,13 @@ bot.onText(/\/renamechatimg (.+) (.+)/, async (msg, match) => {
     );
 
     if (!photoDoc) {
-      bot.sendMessage(chatId, `❌ Dạ em không tìm thấy ảnh *${oldName}* của nhóm để đổi tên ạ!`, {
+      bot.sendMessage(chatId, `❌ Dạ em không tìm thấy ảnh *${escapeMarkdown(oldName)}* của nhóm để đổi tên ạ!`, {
         parse_mode: 'Markdown',
       });
       return;
     }
 
-    bot.sendMessage(chatId, `✅ Dạ em đã đổi tên ảnh nhóm từ *${oldName}* thành *${newName}* rồi ạ!`, {
+    bot.sendMessage(chatId, `✅ Dạ em đã đổi tên ảnh nhóm từ *${escapeMarkdown(oldName)}* thành *${escapeMarkdown(newName)}* rồi ạ!`, {
       parse_mode: 'Markdown',
     });
   } catch (err) {
@@ -737,14 +737,14 @@ bot.onText(/\/allphoto/, async (msg) => {
     const photos = await Photo.find({ userId });
 
     if (photos.length === 0) {
-      bot.sendMessage(chatId, `📸 Dạ ${msg.from.first_name} ơi, em không thấy ảnh nào của bạn cả ạ!`, {
+      bot.sendMessage(chatId, `📸 Dạ ${escapeMarkdown(msg.from.first_name)} ơi, em không thấy ảnh nào của bạn cả ạ!`, {
         parse_mode: 'Markdown',
       });
       return;
     }
 
-    const photoNames = photos.map(photo => photo.photoName).join(', ');
-    bot.sendMessage(chatId, `📸 Dạ ${msg.from.first_name} ơi, đây là tất cả ảnh của bạn: *${photoNames}*`, {
+    const photoNames = photos.map(photo => escapeMarkdown(photo.photoName)).join(', ');
+    bot.sendMessage(chatId, `📸 Dạ ${escapeMarkdown(msg.from.first_name)} ơi, đây là tất cả ảnh của bạn: *${photoNames}*`, {
       parse_mode: 'Markdown',
     });
   } catch (err) {
@@ -767,7 +767,7 @@ bot.onText(/\/allchatimg/, async (msg) => {
       return;
     }
 
-    const photoNames = photos.map(photo => photo.photoName).join(', ');
+    const photoNames = photos.map(photo => escapeMarkdown(photo.photoName)).join(', ');
     bot.sendMessage(chatId, `📸 Dạ nhóm ơi, đây là tất cả ảnh của nhóm: *${photoNames}*`, {
       parse_mode: 'Markdown',
     });
@@ -840,7 +840,7 @@ bot.onText(/\/lucky/, (msg) => {
   const percent = Math.floor(Math.random() * 100) + 1;
   const luckyMessage = luckyTemplate.replace('{percent}', percent);
 
-  bot.sendMessage(chatId, `🎰 *${userName}:* ${luckyMessage}`, { parse_mode: 'Markdown' });
+  bot.sendMessage(chatId, `🎰 *${escapeMarkdown(userName)}:* ${luckyMessage}`, { parse_mode: 'Markdown' });
 });
 
 const ai = new GoogleGenAI({
@@ -859,7 +859,7 @@ bot.onText(/\/ai (.+)/, async (msg, match) => {
       model: "gemini-2.5-flash",
       contents: prompt,
     });
-    bot.sendMessage(chatId, `${aiResponse.text}`, { parse_mode: 'Markdown' });
+    bot.sendMessage(chatId, `${escapeMarkdown(aiResponse.text)}`, { parse_mode: 'Markdown' });
   } catch (error) {
     console.error('Error getting AI response:', error);
     bot.sendMessage(chatId, '⚠️ Dạ em xin lỗi, có lỗi khi lấy phản hồi từ AI ạ!');
