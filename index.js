@@ -852,11 +852,13 @@ const ai = new GoogleGenAI({
 bot.onText(/\/ai (.+)/, async (msg, match) => {
   const chatId = msg.chat.id;
   const userName = msg.from.first_name + (msg.from.last_name ? ' ' + msg.from.last_name : '');
-  let prompt = `from: ${userName}\nquestion: ${msg.text}\nanswer with rude tone and swear like friends with each other, keep it short and like a real-life conversation.`;
+  let prompt = `from: ${userName}
+  question: ${msg.text}
+  answer with rude tone and swear like friends with each other, keep it short and like a real-life conversation.`;
   const isDat = userName.toLowerCase().includes('đạt') || userName.toLowerCase().includes('dat');
-  if (isDat) {
-    prompt = `from: ${userName}\nquestion: ${msg.text}\nanswer with extremely polite, flattering, obedient, gentle tone as if you're talking to someone you admire. Keep it short.`
-  }
+  // if (isDat) {
+  //   prompt = `from: ${userName}\nquestion: ${msg.text}\nanswer with extremely polite, flattering, obedient, gentle tone as if you're talking to someone you admire. Keep it short.`
+  // }
   try {
     const aiResponse = await ai.models.generateContent({
       model: "gemini-2.5-flash",
