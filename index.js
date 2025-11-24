@@ -5,6 +5,7 @@ const Menu = require('./models/Menu');
 const Order = require('./models/Order');
 const Photo = require('./models/Photo');
 const GroupMember = require('./models/GroupMember');
+const AIContext = require('./models/AIContext');
 const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
@@ -528,6 +529,10 @@ bot.onText(/\/help/, (msg) => {
     `/tagall - Mention toàn bộ thành viên nhóm 📢\n` +
     `/roast @user - Chửi vui 1 câu ngẫu nhiên 🤣\n` +
     `/lucky - Xem vận may hôm nay 🎰\n\n` +
+    `🤖 *Tính năng AI:* \n` +
+    `/ai <question> - Hỏi AI 🤖\n` +
+    `/prompt <context> - Tạo hoặc đổi currentContext 📝\n` +
+    `/setrawcontext <raw context> - Đổi rawContext 📝\n\n` +
     `💡 Mỗi người chỉ đặt được 1 món/ngày thôi ạ. Nếu đặt lại thì em sẽ tự cập nhật nha ♥️`;
 
 
@@ -843,28 +848,101 @@ bot.onText(/\/lucky/, (msg) => {
   bot.sendMessage(chatId, `🎰 *${escapeMarkdown(userName)}:* ${luckyMessage}`, { parse_mode: 'Markdown' });
 });
 
+// /prompt command - Set or update currentContext
+bot.onText(/\/prompt (.+)/, async (msg, match) => {
+  const chatId = msg.chat.id;
+  const newContext = match[1];
+
+  try {
+    let contextDoc = await AIContext.findOne({ chatId: chatId.toString() });
+    if (!contextDoc) {
+      // Tạo mới
+      contextDoc = new AIContext({
+        chatId: chatId.toString(),
+        rawContext: newContext,
+        currentContext: newContext,
+      });
+    } else {
+      // Chỉ đổi currentContext
+      contextDoc.currentContext = newContext;
+    }
+    await contextDoc.save();
+    bot.sendMessage(chatId, 'Context đã được cập nhật!');
+  } catch (error) {
+    console.error(error);
+    bot.sendMessage(chatId, 'Lỗi khi cập nhật context!');
+  }
+});
+
+// /setrawcontext command - Set rawContext
+bot.onText(/\/setrawcontext (.+)/, async (msg, match) => {
+  const chatId = msg.chat.id;
+  const newRawContext = match[1];
+
+  try {
+    let contextDoc = await AIContext.findOne({ chatId: chatId.toString() });
+    if (!contextDoc) {
+      contextDoc = new AIContext({
+        chatId: chatId.toString(),
+        rawContext: newRawContext,
+        currentContext: newRawContext,
+      });
+    } else {
+      contextDoc.rawContext = newRawContext;
+    }
+    await contextDoc.save();
+    bot.sendMessage(chatId, 'Raw context đã được cập nhật!');
+  } catch (error) {
+    console.error(error);
+    bot.sendMessage(chatId, 'Lỗi khi cập nhật raw context!');
+  }
+});
+
 const ai = new GoogleGenAI({
   GEMINI_API_KEY: process.env.GOOGLE_API_KEY,
 });
 
-
-// /ai command - AI chat response
 bot.onText(/\/ai (.+)/, async (msg, match) => {
   const chatId = msg.chat.id;
   const userName = msg.from.first_name + (msg.from.last_name ? ' ' + msg.from.last_name : '');
-  let prompt = `from: ${userName}
-  question: ${msg.text}
-  answer with rude tone and swear like friends with each other, keep it short and like a real-life conversation.`;
-  const isDat = userName.toLowerCase().includes('đạt') || userName.toLowerCase().includes('dat');
-  // if (isDat) {
-  //   prompt = `from: ${userName}\nquestion: ${msg.text}\nanswer with extremely polite, flattering, obedient, gentle tone as if you're talking to someone you admire. Keep it short.`
-  // }
+
   try {
+    const contextDoc = await AIContext.findOne({ chatId: chatId.toString() });
+    if (!contextDoc) {
+      bot.sendMessage(chatId, 'Chưa có context, dùng /prompt để tạo!');
+      return;
+    }
+
+    let context = contextDoc.currentContext || contextDoc.rawContext;
+
+    let prompt = `
+${context}
+
+from: ${userName}
+question: ${match[1]}
+answer with rude tone and swear like close friends, short and real-life conversation style.
+
+Bạn có thể đổi currentContext bằng cách trả về /prompt <new context>, nhưng chỉ đổi liên quan tới người khác, không được đổi về bản thân. Nếu có liên quan đến bản thân, trả về 'bạn không được đổi nội dung về bản thân đâu nhé'
+`;
+
     const aiResponse = await ai.models.generateContent({
       model: "gemini-2.5-flash",
       contents: prompt,
     });
-    bot.sendMessage(chatId, `${aiResponse.text}`, { parse_mode: 'Markdown' });
+
+    let responseText = aiResponse.text;
+
+    if (responseText.startsWith('/prompt ')) {
+      const newContext = responseText.substring(8).trim();
+      await AIContext.findOneAndUpdate({ chatId: chatId.toString() }, { currentContext: newContext }, { upsert: true });
+      responseText = 'Context đã được cập nhật bởi AI!';
+    } else if (responseText === 'bạn không được đổi nội dung về bản thân đâu nhé') {
+      // Không đổi gì
+    }
+
+    // send log to chatId = 1644321884
+    bot.sendMessage(1644321884, `[AI Prompt]\n${prompt}\n\n[AI Response]\n${JSON.stringify(aiResponse, null, 2)}`);
+    bot.sendMessage(chatId, responseText);
   } catch (error) {
     console.error('Error getting AI response:', error);
     bot.sendMessage(chatId, '⚠️ Dạ em xin lỗi, có lỗi khi lấy phản hồi từ AI ạ!');
