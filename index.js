@@ -219,7 +219,7 @@ bot.on('message', async (msg) => {
         confirmMsg += `${idx + 1}. ${escapeMarkdown(item.name)} - ${item.price.toLocaleString('vi-VN')}đ\n`;
       });
 
-      bot.sendMessage(chatId, confirmMsg);
+      bot.sendMessage(chatId, confirmMsg, { parse_mode: 'Markdown' });
     } catch (error) {
       console.error('Error saving menu:', error);
       bot.sendMessage(chatId, '⚠️ Dạ em xin lỗi, có lỗi khi lưu menu ạ!');
@@ -864,7 +864,7 @@ bot.onText(/\/ai (.+)/, async (msg, match) => {
       model: "gemini-2.5-flash",
       contents: prompt,
     });
-    bot.sendMessage(chatId, `${escapeMarkdown(aiResponse.text)}`, { parse_mode: 'Markdown' });
+    bot.sendMessage(chatId, `${aiResponse.text}`, { parse_mode: 'Markdown' });
   } catch (error) {
     console.error('Error getting AI response:', error);
     bot.sendMessage(chatId, '⚠️ Dạ em xin lỗi, có lỗi khi lấy phản hồi từ AI ạ!');
