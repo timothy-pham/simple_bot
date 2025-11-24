@@ -531,8 +531,9 @@ bot.onText(/\/help/, (msg) => {
     `/lucky - Xem vận may hôm nay 🎰\n\n` +
     `🤖 *Tính năng AI:* \n` +
     `/ai <question> - Hỏi AI 🤖\n` +
-    `/prompt <context> - Tạo hoặc đổi currentContext 📝\n` +
-    `/setrawcontext <raw context> - Đổi rawContext 📝\n\n` +
+    `/prompt <yêu cầu> - Cập nhật currentContext bằng Gemini 📝\n` +
+    `/setrawcontext <raw context> - Đặt rawContext 📝\n` +
+    `/getcontext - Xem context hiện tại 🔍\n\n` +
     `💡 Mỗi người chỉ đặt được 1 món/ngày thôi ạ. Nếu đặt lại thì em sẽ tự cập nhật nha ♥️`;
 
 
@@ -848,26 +849,61 @@ bot.onText(/\/lucky/, (msg) => {
   bot.sendMessage(chatId, `🎰 *${escapeMarkdown(userName)}:* ${luckyMessage}`, { parse_mode: 'Markdown' });
 });
 
-// /prompt command - Set or update currentContext
+// /prompt command - Update currentContext using Gemini
 bot.onText(/\/prompt (.+)/, async (msg, match) => {
   const chatId = msg.chat.id;
-  const newContext = match[1];
+  const userPrompt = match[1];
 
   try {
     let contextDoc = await AIContext.findOne({ chatId: chatId.toString() });
     if (!contextDoc) {
-      // Tạo mới
-      contextDoc = new AIContext({
-        chatId: chatId.toString(),
-        rawContext: newContext,
-        currentContext: newContext,
-      });
-    } else {
-      // Chỉ đổi currentContext
-      contextDoc.currentContext = newContext;
+      bot.sendMessage(chatId, 'Chưa có context, dùng /setrawcontext để tạo trước!');
+      return;
     }
-    await contextDoc.save();
-    bot.sendMessage(chatId, 'Context đã được cập nhật!');
+
+    const currentContext = contextDoc.currentContext || contextDoc.rawContext;
+
+    const geminiPrompt = `
+Context hiện tại:
+${currentContext}
+Yêu cầu cập nhật: ${userPrompt}
+Người yêu cầu: ${msg.from.first_name} ${msg.from.last_name || ''}
+Chỉ đổi liên quan tới người khác, không được đổi về bản thân. Nếu yêu cầu có liên quan đến bản thân (người yêu cầu), trả về chính xác đoạn text 'Mày không được đổi nội dung về bản thân đâu nhé'
+Nếu hợp lệ trả về chính xác nội dung context mới đã được cập nhật dựa trên yêu cầu, giữ lại phần hợp lý từ context cũ. Không thêm bớt từ ngữ nào khác. Giữ lại cả phần mô tả hoàn cảnh nếu có.
+VD:
+Context cũ:
+Bạn đang nhập vai AI trong group "Tổ rắn độc"
+Các nhân vật trong group (có thể nhắc đến khi phù hợp, theo kiểu bạn bè thân thiết cà khịa nhau)
+- Minh C: BA NNS, bắn pubg ngu, hay bị chị H chửi.
+- Minh D: Dev Fullstack, trùm đánh cầu lông.
+
+Yêu cầu: "Hãy thêm thành viên mới tên Tuấn Anh, là Dev AI, thích chơi game và đọc sách."
+
+Context mới:
+Bạn đang nhập vai AI trong group "Tổ rắn độc"
+Các nhân vật trong group (có thể nhắc đến khi phù hợp, theo kiểu bạn bè thân thiết cà khịa nhau)
+- Minh C: BA NNS, bắn pubg ngu, hay bị chị H chửi.
+- Minh D: Dev Fullstack, trùm đánh cầu lông.
+- Tuấn Anh: Dev AI, thích chơi game và đọc sách.
+`;
+
+    const aiResponse = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: geminiPrompt,
+    });
+
+    const newContext = aiResponse.text.trim();
+
+    if (newContext === 'Mày không được đổi nội dung về bản thân đâu nhé') {
+      // Không đổi gì
+      bot.sendMessage(chatId, 'Yêu cầu của bạn liên quan đến bản thân, context không được thay đổi!');
+    } else {
+      contextDoc.currentContext = newContext;
+      await contextDoc.save();
+      bot.sendMessage(chatId, 'Context đã được cập nhật! Đây là context hiện tại:\n\n' + newContext);
+    }
+
+
   } catch (error) {
     console.error(error);
     bot.sendMessage(chatId, 'Lỗi khi cập nhật context!');
@@ -898,6 +934,25 @@ bot.onText(/\/setrawcontext (.+)/, async (msg, match) => {
   }
 });
 
+// /getcontext command - Get current context
+bot.onText(/\/getcontext/, async (msg) => {
+  const chatId = msg.chat.id;
+
+  try {
+    const contextDoc = await AIContext.findOne({ chatId: chatId.toString() });
+    if (!contextDoc) {
+      bot.sendMessage(chatId, 'Chưa có context!');
+      return;
+    }
+
+    const currentContext = contextDoc.currentContext || contextDoc.rawContext;
+    bot.sendMessage(chatId, 'Context hiện tại:\n\n' + currentContext);
+  } catch (error) {
+    console.error(error);
+    bot.sendMessage(chatId, 'Lỗi khi lấy context!');
+  }
+});
+
 const ai = new GoogleGenAI({
   GEMINI_API_KEY: process.env.GOOGLE_API_KEY,
 });
@@ -920,10 +975,7 @@ ${context}
 
 from: ${userName}
 question: ${match[1]}
-answer with rude tone and swear like close friends, short and real-life conversation style.
-
-Bạn có thể đổi currentContext bằng cách trả về /prompt <new context>, nhưng chỉ đổi liên quan tới người khác, không được đổi về bản thân. Nếu có liên quan đến bản thân, trả về 'bạn không được đổi nội dung về bản thân đâu nhé'
-`;
+answer with rude tone and swear like close friends, short and real-life conversation style.`;
 
     const aiResponse = await ai.models.generateContent({
       model: "gemini-2.5-flash",
@@ -933,7 +985,22 @@ Bạn có thể đổi currentContext bằng cách trả về /prompt <new conte
     let responseText = aiResponse.text;
 
     if (responseText.startsWith('/prompt ')) {
-      const newContext = responseText.substring(8).trim();
+      const userPrompt = responseText.substring(8).trim();
+      const geminiPrompt = `
+Context hiện tại:
+${context}
+
+Yêu cầu cập nhật: ${userPrompt}
+
+Hãy trả về context mới đã được cập nhật dựa trên yêu cầu, giữ lại phần hợp lý từ context cũ.
+`;
+
+      const updateResponse = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: geminiPrompt,
+      });
+
+      const newContext = updateResponse.text.trim();
       await AIContext.findOneAndUpdate({ chatId: chatId.toString() }, { currentContext: newContext }, { upsert: true });
       responseText = 'Context đã được cập nhật bởi AI!';
     } else if (responseText === 'bạn không được đổi nội dung về bản thân đâu nhé') {
