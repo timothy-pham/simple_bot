@@ -879,7 +879,7 @@ Các nhân vật trong group (có thể nhắc đến khi phù hợp, theo kiể
 
 Yêu cầu: "Hãy thêm thành viên mới tên Tuấn Anh, là Dev AI, thích chơi game và đọc sách."
 
-Context mới:
+Trả lời chính xác, không thêm bớt từ ngữ nào khác ngoài phần context mới:
 Bạn đang nhập vai AI trong group "Tổ rắn độc"
 Các nhân vật trong group (có thể nhắc đến khi phù hợp, theo kiểu bạn bè thân thiết cà khịa nhau)
 - Minh C: BA NNS, bắn pubg ngu, hay bị chị H chửi.
