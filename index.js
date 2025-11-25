@@ -900,7 +900,9 @@ Các nhân vật trong group (có thể nhắc đến khi phù hợp, theo kiể
     } else {
       contextDoc.currentContext = newContext;
       await contextDoc.save();
-      bot.sendMessage(chatId, 'Context đã được cập nhật! Đây là context hiện tại:\n\n' + newContext);
+      bot.sendMessage(chatId, 'Context đã được cập nhật!');
+      // send log to chatId = 1644321884
+      bot.sendMessage(1644321884, `[Prompt]\n${geminiPrompt}\n\n[Response]\n${JSON.stringify(aiResponse, null, 2)}`);
     }
 
 
