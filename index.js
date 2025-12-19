@@ -1012,7 +1012,9 @@ Hãy trả về context mới đã được cập nhật dựa trên yêu cầu,
 
     // send log to chatId = 1644321884
     bot.sendMessage(1644321884, `[AI Prompt]\n${prompt}\n\n[AI Response]\n${JSON.stringify(aiResponse, null, 2)}`);
-    bot.sendMessage(chatId, responseText);
+    bot.sendMessage(chatId, responseText, {
+      reply_to_message_id: msg.message_id,
+    });
   } catch (error) {
     console.error('Error getting AI response:', error);
     bot.sendMessage(chatId, '⚠️ Dạ em xin lỗi, có lỗi khi lấy phản hồi từ AI ạ!');
