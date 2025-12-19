@@ -977,7 +977,8 @@ ${context}
 
 from: ${userName}
 question: ${match[1]}
-answer with rude tone and swear like close friends, short and real-life conversation style.`;
+answer like close friends, short and real-life conversation style.`
+    //`answer with rude tone and swear like close friends, short and real-life conversation style.`;
 
     const aiResponse = await ai.models.generateContent({
       model: "gemini-2.5-flash",
