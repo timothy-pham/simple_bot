@@ -125,7 +125,7 @@ bot.on('message', async (msg) => {
     try {
       const badWordsInMessage = getBadWordsInMessage(text);
       // Thả cảm xúc phẫn nộ vào tin nhắn
-      await bot.setMessageReaction(chatId, msg.message_id, { reaction: [{ type: 'emoji', emoji: '😡' }] });
+      // await bot.setMessageReaction(chatId, msg.message_id, { reaction: [{ type: 'emoji', emoji: '😡' }] });
 
 
       // await bot.sendMessage(
