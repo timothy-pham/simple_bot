@@ -720,9 +720,12 @@ bot.onText(/\/getchatimg(?:@[\w_]+)?\s*$/, async (msg) => {
       return;
     }
 
-    // Build inline keyboard (limit to 20 buttons shown)
-    const buttons = photos.slice(0, 20).map(photo => ([{ text: photo.photoName, callback_data: `getchatimg:${photo.photoName}` }]));
-    if (photos.length > 20) buttons.push([{ text: 'Xem thêm...', callback_data: 'getchatimg:__more' }]);
+    // Build inline keyboard with pagination (page size = 20)
+    const PAGE_SIZE = 20;
+    const page = 1;
+    const pagePhotos = photos.slice(0, PAGE_SIZE);
+    const buttons = pagePhotos.map(photo => ([{ text: photo.photoName, callback_data: `getchatimg:${photo.photoName}` }]));
+    if (photos.length > PAGE_SIZE) buttons.push([{ text: 'Xem thêm...', callback_data: `getchatimg:__page:2` }]);
 
     bot.sendMessage(chatId, '📸 Chọn ảnh nhóm để lấy:', {
       reply_markup: { inline_keyboard: buttons }
@@ -738,18 +741,39 @@ bot.on('callback_query', async (callbackQuery) => {
   try {
     const data = callbackQuery.data;
     if (!data || !data.startsWith('getchatimg:')) return;
-    const payload = data.split(':')[1];
+    const parts = data.split(':');
     const chatId = callbackQuery.message.chat.id;
 
-    if (payload === '__more') {
+    // Pagination handler: get next/prev page and edit the inline keyboard
+    if (parts[1] === '__page') {
+      const requestedPage = parseInt(parts[2], 10) || 1;
       const photos = await Photo.find({ chatId: chatId.toString() });
-      const photoNames = photos.map(p => escapeMarkdown(p.photoName)).join(', ');
-      await bot.sendMessage(chatId, `📸 Dạ nhóm ơi, đây là tất cả ảnh của nhóm: *${photoNames}*`, { parse_mode: 'Markdown' });
+      const PAGE_SIZE = 20;
+      const totalPages = Math.max(1, Math.ceil(photos.length / PAGE_SIZE));
+      const page = Math.min(Math.max(1, requestedPage), totalPages);
+      const start = (page - 1) * PAGE_SIZE;
+      const pagePhotos = photos.slice(start, start + PAGE_SIZE);
+
+      const buttons = pagePhotos.map(photo => ([{ text: photo.photoName, callback_data: `getchatimg:${photo.photoName}` }]));
+
+      // Navigation row
+      const nav = [];
+      if (page > 1) nav.push({ text: '« Trước', callback_data: `getchatimg:__page:${page - 1}` });
+      if (page < totalPages) nav.push({ text: 'Sau »', callback_data: `getchatimg:__page:${page + 1}` });
+      if (nav.length) buttons.push(nav);
+
+      try {
+        await bot.editMessageReplyMarkup({ inline_keyboard: buttons }, { chat_id: chatId, message_id: callbackQuery.message.message_id });
+      } catch (err) {
+        // Fallback: send a new message if editing fails
+        await bot.sendMessage(chatId, '📸 Chọn ảnh nhóm để lấy:', { reply_markup: { inline_keyboard: buttons } });
+      }
+
       await bot.answerCallbackQuery(callbackQuery.id);
       return;
     }
 
-    const photoName = payload;
+    const photoName = parts.slice(1).join(':');
     const photoDoc = await Photo.findOne({ chatId: chatId.toString(), photoName });
     if (!photoDoc) {
       await bot.answerCallbackQuery(callbackQuery.id, { text: '❌ Không tìm thấy ảnh' });
