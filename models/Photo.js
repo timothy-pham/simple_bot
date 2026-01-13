@@ -8,6 +8,7 @@ const PhotoSchema = new mongoose.Schema({
         required: true
     },
     url: { type: String, required: true },
+    type: { type: String, enum: ['photo', 'video'], default: 'photo' },
     createdAt: { type: Date, default: Date.now },
 });
 

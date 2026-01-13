@@ -611,7 +611,7 @@ bot.on('photo', async (msg) => {
     const query = isChatImg ? { chatId: chatId.toString(), photoName } : { userId, photoName };
     const photoDoc = await Photo.findOneAndUpdate(
       query,
-      { url: fileUrl },
+      { url: fileUrl, type: 'photo' },
       { new: true, upsert: true }
     );
 
@@ -623,6 +623,62 @@ bot.on('photo', async (msg) => {
   } catch (err) {
     console.error('Error saving photo:', err);
     bot.sendMessage(chatId, '⚠️ Dạ em xin lỗi, có lỗi khi lưu ảnh ạ!');
+  }
+});
+
+// 📹 Khi user gửi video (hỗ trợ cho /savechatimg)
+bot.on('video', async (msg) => {
+  const chatId = msg.chat.id;
+  const userId = msg.from.id;
+
+  let videoName;
+  let isChatImg = false;
+
+  if (waitingForChatImg[chatId]) {
+    videoName = waitingForChatImg[chatId];
+    delete waitingForChatImg[chatId];
+    isChatImg = true;
+  } else {
+    return;
+  }
+
+  try {
+    const video = msg.video;
+    const fileId = video.file_id;
+    const fileLink = await bot.getFileLink(fileId);
+
+    const response = await axios.get(fileLink, { responseType: 'arraybuffer' });
+    const buffer = Buffer.from(response.data);
+
+    const videoNameify = slugify(videoName, { lower: true });
+    const minioPath = `${isChatImg ? 'chat_' + chatId : userId}_${videoNameify}_${Date.now()}.mp4`;
+    const metaData = {
+      'Content-Type': mime.lookup(minioPath) || 'video/mp4',
+      'Content-Disposition': 'inline',
+    };
+
+    // Upload lên MinIO
+    await minioClient.putObject('telebot', minioPath, buffer, metaData);
+
+    // URL public
+    const fileUrl = `https://${process.env.MINIO_ENDPOINT}/telebot/${minioPath}`;
+
+    // Lưu DB (loại video)
+    const query = { chatId: chatId.toString(), photoName: videoName };
+    const photoDoc = await Photo.findOneAndUpdate(
+      query,
+      { url: fileUrl, type: 'video' },
+      { new: true, upsert: true }
+    );
+
+    bot.sendMessage(chatId, `✅ Em đã lưu video *${escapeMarkdown(videoName)}* thành công!
+`, {
+      parse_mode: 'Markdown',
+    });
+
+  } catch (err) {
+    console.error('Error saving video:', err);
+    bot.sendMessage(chatId, '⚠️ Dạ em xin lỗi, có lỗi khi lưu video ạ!');
   }
 });
 
@@ -652,6 +708,66 @@ bot.onText(/\/getphoto (.+)/, async (msg, match) => {
   }
 });
 
+// If user runs "/getchatimg" without args, show suggestions as inline buttons
+// Match `/getchatimg`, `/getchatimg@BotName`, and allow trailing spaces
+bot.onText(/\/getchatimg(?:@[\w_]+)?\s*$/, async (msg) => {
+  const chatId = msg.chat.id;
+  try {
+    const photos = await Photo.find({ chatId: chatId.toString() });
+
+    if (photos.length === 0) {
+      bot.sendMessage(chatId, '📸 Dạ nhóm ơi, em không thấy ảnh nào của nhóm cả ạ!');
+      return;
+    }
+
+    // Build inline keyboard (limit to 20 buttons shown)
+    const buttons = photos.slice(0, 20).map(photo => ([{ text: photo.photoName, callback_data: `getchatimg:${photo.photoName}` }]));
+    if (photos.length > 20) buttons.push([{ text: 'Xem thêm...', callback_data: 'getchatimg:__more' }]);
+
+    bot.sendMessage(chatId, '📸 Chọn ảnh nhóm để lấy:', {
+      reply_markup: { inline_keyboard: buttons }
+    });
+  } catch (err) {
+    console.error('Error showing chat img suggestions:', err);
+    bot.sendMessage(chatId, '⚠️ Dạ em xin lỗi, có lỗi khi lấy danh sách ảnh nhóm ạ!');
+  }
+});
+
+// Handle callback when user taps suggested photo buttons
+bot.on('callback_query', async (callbackQuery) => {
+  try {
+    const data = callbackQuery.data;
+    if (!data || !data.startsWith('getchatimg:')) return;
+    const payload = data.split(':')[1];
+    const chatId = callbackQuery.message.chat.id;
+
+    if (payload === '__more') {
+      const photos = await Photo.find({ chatId: chatId.toString() });
+      const photoNames = photos.map(p => escapeMarkdown(p.photoName)).join(', ');
+      await bot.sendMessage(chatId, `📸 Dạ nhóm ơi, đây là tất cả ảnh của nhóm: *${photoNames}*`, { parse_mode: 'Markdown' });
+      await bot.answerCallbackQuery(callbackQuery.id);
+      return;
+    }
+
+    const photoName = payload;
+    const photoDoc = await Photo.findOne({ chatId: chatId.toString(), photoName });
+    if (!photoDoc) {
+      await bot.answerCallbackQuery(callbackQuery.id, { text: '❌ Không tìm thấy ảnh' });
+      return;
+    }
+
+    if (photoDoc.type === 'video') {
+      await bot.sendVideo(chatId, photoDoc.url, { caption: `📹*${escapeMarkdown(photoName)}*`, parse_mode: 'Markdown' });
+    } else {
+      await bot.sendPhoto(chatId, photoDoc.url, { caption: `📸*${escapeMarkdown(photoName)}*`, parse_mode: 'Markdown' });
+    }
+
+    await bot.answerCallbackQuery(callbackQuery.id);
+  } catch (err) {
+    console.error('Error handling callback_query:', err);
+  }
+});
+
 // 🔍 Command: /getchatimg momo
 bot.onText(/\/getchatimg (.+)/, async (msg, match) => {
   const chatId = msg.chat.id;
@@ -667,10 +783,17 @@ bot.onText(/\/getchatimg (.+)/, async (msg, match) => {
       return;
     }
 
-    bot.sendPhoto(chatId, photoDoc.url, {
-      caption: `📸*${escapeMarkdown(photoName)}*`,
-      parse_mode: 'Markdown',
-    });
+    if (photoDoc.type === 'video') {
+      bot.sendVideo(chatId, photoDoc.url, {
+        caption: `📹*${escapeMarkdown(photoName)}*`,
+        parse_mode: 'Markdown',
+      });
+    } else {
+      bot.sendPhoto(chatId, photoDoc.url, {
+        caption: `📸*${escapeMarkdown(photoName)}*`,
+        parse_mode: 'Markdown',
+      });
+    }
   } catch (err) {
     console.error('Error fetching chat img:', err);
     bot.sendMessage(chatId, '⚠️ Dạ em xin lỗi, có lỗi khi lấy ảnh nhóm ạ!');

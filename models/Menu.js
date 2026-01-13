@@ -24,7 +24,7 @@ const menuSchema = new mongoose.Schema({
   }
 });
 
-// Index for efficient chatId queries
-menuSchema.index({ chatId: 1 });
+// Note: `chatId` is already declared `unique: true` in the schema above,
+// which creates an index. Avoid declaring a duplicate index here.
 
 module.exports = mongoose.model('Menu', menuSchema);
