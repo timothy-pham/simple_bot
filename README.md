@@ -3,6 +3,61 @@
 Bot Telegram đơn giản hỗ trợ đặt cơm hằng ngày trong group, lưu dữ liệu vào MongoDB và thống kê kết quả.
 Ngoài ra còn hỗ trợ lưu trữ và truy xuất hình ảnh theo người dùng, cùng các tính năng vui như mention toàn bộ thành viên, roast bạn bè, và xem vận may ngẫu nhiên.
 
+## Cài đặt
+
+### Yêu cầu
+
+- Node.js 14+
+- MongoDB
+- Telegram Bot Token (từ @BotFather)
+- MinIO (hoặc dịch vụ lưu trữ tương tự)
+- Gemini API Key (nếu sử dụng tính năng AI - https://aistudio.google.com/app/api-keys)
+
+### Các bước cài đặt
+
+1. Clone repository:
+
+```bash
+git clone https://github.com/timothy-pham/simple_bot.git
+cd simple_bot
+```
+
+2. Cài đặt dependencies:
+
+```bash
+npm install
+```
+
+3. Tạo file `.env` từ `.env.example`:
+
+```bash
+cp .env.example .env
+```
+
+4. Cấu hình file `.env`:
+
+```
+TELEGRAM_BOT_TOKEN=your_telegram_bot_token_here
+MONGODB_URI=mongodb://localhost:27017/simple_bot
+MINIO_ENDPOINT=your_minio_endpoint_here
+MINIO_ACCESS_KEY=your_minio_access_key_here
+MINIO_SECRET_KEY=your_minio_secret_key_here
+GEMINI_API_KEY=your_gemini_api_key_here
+ADMIN_CHAT_ID=your_admin_chat_id_here
+```
+
+5. Chạy bot:
+
+```bash
+npm start
+```
+
+Hoặc chạy với nodemon để tự động restart khi có thay đổi:
+
+```bash
+npm run dev
+```
+
 ## Tính năng
 
 ### 1. Gửi thực đơn
@@ -161,6 +216,7 @@ Sử dụng lệnh `/roast @user` để bot chửi vui một người dùng vớ
 ```
 
 **Các câu chửi vui mẫu:**
+
 - "hôm nay lag não à?"
 - "code bug mà tự tin dữ ha!"
 - "sao hôm nay nhìn giống con bug vậy? 🐛"
@@ -184,60 +240,10 @@ Sử dụng lệnh `/lucky` để xem vận may ngẫu nhiên trong ngày.
 ```
 
 Bot sẽ trả lời với một câu may mắn ngẫu nhiên như:
+
 - "Bạn hôm nay có 87% cơ hội bị QA chửi."
 - "Bạn hôm nay có 92% cơ hội deploy thành công."
 - "Bạn hôm nay có 45% cơ hội code không bug."
-
-## Cài đặt
-
-### Yêu cầu
-
-- Node.js 14+
-- MongoDB
-- Telegram Bot Token (từ @BotFather)
-
-### Các bước cài đặt
-
-1. Clone repository:
-
-```bash
-git clone https://github.com/timothy-pham/simple_bot.git
-cd simple_bot
-```
-
-2. Cài đặt dependencies:
-
-```bash
-npm install
-```
-
-3. Tạo file `.env` từ `.env.example`:
-
-```bash
-cp .env.example .env
-```
-
-4. Cấu hình file `.env`:
-
-```
-TELEGRAM_BOT_TOKEN=your_telegram_bot_token_here
-MONGODB_URI=mongodb://localhost:27017/simple_bot
-MINIO_ENDPOINT=your_minio_endpoint_here
-MINIO_ACCESS_KEY=your_minio_access_key_here
-MINIO_SECRET_KEY=your_minio_secret_key_here
-```
-
-5. Chạy bot:
-
-```bash
-npm start
-```
-
-Hoặc chạy với nodemon để tự động restart khi có thay đổi:
-
-```bash
-npm run dev
-```
 
 ## Cấu trúc dự án
 

@@ -19,6 +19,7 @@ const messages = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'messag
 // Connect to MongoDB
 connectDB();
 
+const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID;
 // Create bot instance
 const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: true });
 
@@ -1048,8 +1049,8 @@ Các nhân vật trong group (có thể nhắc đến khi phù hợp, theo kiể
       contextDoc.currentContext = newContext;
       await contextDoc.save();
       bot.sendMessage(chatId, 'Context đã được cập nhật!');
-      // send log to chatId = 1644321884
-      bot.sendMessage(1644321884, `[Prompt]\n${geminiPrompt}\n\n[Response]\n${JSON.stringify(aiResponse, null, 2)}`);
+      // send log to chatId = ADMIN_CHAT_ID
+      bot.sendMessage(ADMIN_CHAT_ID, `[Prompt]\n${geminiPrompt}\n\n[Response]\n${JSON.stringify(aiResponse, null, 2)}`);
     }
 
 
@@ -1157,8 +1158,8 @@ Hãy trả về context mới đã được cập nhật dựa trên yêu cầu,
       // Không đổi gì
     }
 
-    // send log to chatId = 1644321884
-    bot.sendMessage(1644321884, `[AI Prompt]\n${prompt}\n\n[AI Response]\n${JSON.stringify(aiResponse, null, 2)}`);
+    // send log to chatId = ADMIN_CHAT_ID
+    bot.sendMessage(ADMIN_CHAT_ID, `[AI Prompt]\n${prompt}\n\n[AI Response]\n${JSON.stringify(aiResponse, null, 2)}`);
     bot.sendMessage(chatId, responseText, {
       reply_to_message_id: msg.message_id,
     });
@@ -1183,7 +1184,7 @@ Hãy trả về context mới đã được cập nhật dựa trên yêu cầu,
 
 
     bot.sendMessage(
-      1644321884,
+      ADMIN_CHAT_ID,
       `Error Code: ${errorCode}\nMessage: ${errorMessage}`
     );
   }
