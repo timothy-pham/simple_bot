@@ -977,29 +977,6 @@ answer like close friends, short and real-life conversation style.`;
 
       let responseText = aiResponse.text;
 
-      if (responseText.startsWith('/prompt ')) {
-        const userPrompt = responseText.substring(8).trim();
-        const updatePrompt = `
-Context hiện tại:
-${context}
-
-Yêu cầu cập nhật: ${userPrompt}
-
-Hãy trả về context mới đã được cập nhật dựa trên yêu cầu, giữ lại phần hợp lý từ context cũ.
-`;
-
-        const updateResponse = await aiClient.models.generateContent({
-          model: 'gemini-2.5-flash',
-          contents: updatePrompt,
-        });
-
-        await aiContextRepository.save(chatId.toString(), {
-          rawContext: contextDoc.rawContext || '',
-          currentContext: updateResponse.text.trim(),
-        });
-        responseText = 'Context đã được cập nhật bởi AI!';
-      }
-
       await sendAdminLog(`[AI Prompt]\n${prompt}\n\n[AI Response]\n${JSON.stringify(aiResponse, null, 2)}`);
       await bot.sendMessage(chatId, responseText, {
         reply_to_message_id: msg.message_id,
