@@ -52,6 +52,49 @@ const registerHandlers = (bot, container) => {
   const waitingForMenu = {};
   const badWordDetector = createBadWordDetector();
 
+  const sendMediaHelper = async (chatId, photoDoc, name) => {
+    const isVideo = photoDoc.type === 'video' || (photoDoc.url && photoDoc.url.includes('.mp4'));
+    const isDoc = photoDoc.type === 'document';
+    let emoji = isVideo ? '📹' : '📸';
+    if (isDoc) emoji = '📄';
+    const caption = `${emoji}*${escapeMarkdown(name)}*`;
+    const options = { caption, parse_mode: 'Markdown' };
+
+    try {
+      if (isDoc) {
+        await bot.sendDocument(chatId, photoDoc.url, options);
+      } else if (isVideo) {
+        await bot.sendVideo(chatId, photoDoc.url, options);
+      } else {
+        await bot.sendPhoto(chatId, photoDoc.url, options);
+      }
+    } catch (error) {
+      if (error.message && error.message.includes('400 Bad Request')) {
+        const response = await axios.get(photoDoc.url, { responseType: 'stream' });
+        let filename = isVideo ? 'video.mp4' : 'image.jpg';
+        let contentType = isVideo ? 'video/mp4' : 'image/jpeg';
+        
+        if (isDoc) {
+          const match = photoDoc.url.match(/\.([a-zA-Z0-9]+)(\?|$)/);
+          const ext = match ? `.${match[1]}` : '.bin';
+          filename = `file${ext}`;
+          contentType = mime.lookup(ext) || 'application/octet-stream';
+        }
+
+        const fileOptions = { filename, contentType };
+        if (isDoc) {
+          await bot.sendDocument(chatId, response.data, options, fileOptions);
+        } else if (isVideo) {
+          await bot.sendVideo(chatId, response.data, options, fileOptions);
+        } else {
+          await bot.sendPhoto(chatId, response.data, options, fileOptions);
+        }
+      } else {
+        throw error;
+      }
+    }
+  };
+
   const sendUnsupported = (chatId) => bot.sendMessage(chatId, UNSUPPORTED_FEATURE_MESSAGE);
 
   const sendAdminLog = async (message) => {
@@ -423,112 +466,107 @@ const registerHandlers = (bot, container) => {
   });
 
   bot.onText(/\/savechatimg (.+)/, async (msg, match) => {
-    if (!isMediaSupported()) {
-      await sendUnsupported(msg.chat.id);
-      return;
-    }
+    try {
+      if (!isMediaSupported()) {
+        await sendUnsupported(msg.chat.id);
+        return;
+      }
 
-    waitingForChatImg[msg.chat.id] = match[1].trim();
-    await bot.sendMessage(
-      msg.chat.id,
-      `📸 Dạ nhóm ơi, gửi ảnh *${escapeMarkdown(match[1].trim())}* cho em nha ạ!`,
-      { parse_mode: 'Markdown' }
-    );
+      waitingForChatImg[msg.chat.id] = { name: match[1].trim(), userId: msg.from.id };
+      await bot.sendMessage(
+        msg.chat.id,
+        `📸 Dạ nhóm ơi, gửi ảnh *${escapeMarkdown(match[1].trim())}* cho em nha ạ!`,
+        { parse_mode: 'Markdown' }
+      );
+    } catch (error) {
+      console.error('Error occurred while saving chat image:', error);
+      await bot.sendMessage(msg.chat.id, '⚠️ Dạ em xin lỗi, có lỗi khi lưu ảnh nhóm ạ!');
+    }
   });
 
-  bot.on('photo', async (msg) => {
+  const handleMediaUpload = async (msg, type) => {
     const chatId = msg.chat.id;
     const userId = msg.from.id;
 
-    if (!isMediaSupported()) {
-      if (waitingForChatImg[chatId] || waitingForPhoto[userId]) {
-        delete waitingForChatImg[chatId];
-        delete waitingForPhoto[userId];
-        await sendUnsupported(chatId);
-      }
-      return;
-    }
-
-    let photoName;
+    let mediaName;
     let isChatImg = false;
 
-    if (waitingForChatImg[chatId]) {
-      photoName = waitingForChatImg[chatId];
+    if (waitingForChatImg[chatId] && waitingForChatImg[chatId].userId === userId) {
+      mediaName = waitingForChatImg[chatId].name;
       delete waitingForChatImg[chatId];
       isChatImg = true;
     } else if (waitingForPhoto[userId]) {
-      photoName = waitingForPhoto[userId];
+      mediaName = waitingForPhoto[userId];
       delete waitingForPhoto[userId];
     } else {
       return;
     }
 
+    if (!isMediaSupported()) {
+      await sendUnsupported(chatId);
+      return;
+    }
+
     try {
-      const photo = msg.photo[msg.photo.length - 1];
-      const fileLink = await bot.getFileLink(photo.file_id);
+      let fileId, extension, mimeType;
+
+      if (type === 'photo') {
+        const photo = msg.photo[msg.photo.length - 1];
+        fileId = photo.file_id;
+        extension = '.jpg';
+      } else if (type === 'video') {
+        fileId = msg.video.file_id;
+        extension = '.mp4';
+      } else if (type === 'animation') {
+        fileId = msg.animation.file_id;
+        extension = '.mp4';
+      } else if (type === 'document') {
+        fileId = msg.document.file_id;
+        extension = msg.document.file_name ? (path.extname(msg.document.file_name) || '') : '';
+        mimeType = msg.document.mime_type;
+      }
+
+      const fileLink = await bot.getFileLink(fileId);
       const response = await axios.get(fileLink, { responseType: 'arraybuffer' });
       const buffer = Buffer.from(response.data);
-      const photoSlug = slugify(photoName, { lower: true });
-      const objectName = `${isChatImg ? `chat_${chatId}` : userId}_${photoSlug}_${Date.now()}.jpg`;
+      const mediaSlug = slugify(mediaName, { lower: true });
+      const prefix = isChatImg ? `chat_${chatId}` : `${userId}`;
+      const objectName = `${prefix}_${mediaSlug}_${Date.now()}${extension}`;
+
+      const contentType = mimeType || mime.lookup(objectName) || 'application/octet-stream';
       const metaData = {
-        'Content-Type': mime.lookup(objectName) || 'image/jpeg',
+        'Content-Type': contentType,
         'Content-Disposition': 'inline',
       };
 
       const fileUrl = await mediaProvider.uploadObject(objectName, buffer, metaData);
       const query = isChatImg
-        ? { chatId: chatId.toString(), photoName }
-        : { userId: userId.toString(), photoName };
+        ? { chatId: chatId.toString(), photoName: mediaName }
+        : { userId: userId.toString(), photoName: mediaName };
 
-      await photoRepository.upsertPhoto(query, { url: fileUrl, type: 'photo' });
-      await bot.sendMessage(chatId, `✅ Em đã lưu ảnh *${escapeMarkdown(photoName)}* thành công!\n`, {
+      let storeType = 'photo';
+      if (type === 'video' || type === 'animation') storeType = 'video';
+      else if (type === 'document') {
+        if (contentType.startsWith('video/')) storeType = 'video';
+        else if (contentType.startsWith('image/')) storeType = 'photo';
+        else storeType = 'document';
+      }
+
+      await photoRepository.upsertPhoto(query, { url: fileUrl, type: storeType });
+
+      await bot.sendMessage(chatId, `✅ Em đã lưu *${escapeMarkdown(mediaName)}* thành công!\n`, {
         parse_mode: 'Markdown',
       });
     } catch (error) {
-      console.error('Error saving photo:', error.message);
-      await bot.sendMessage(chatId, '⚠️ Dạ em xin lỗi, có lỗi khi lưu ảnh ạ!');
+      console.error(`Error saving ${type}:`, error.message);
+      await bot.sendMessage(chatId, '⚠️ Dạ em xin lỗi, có lỗi khi lưu phương tiện ạ!');
     }
-  });
+  };
 
-  bot.on('video', async (msg) => {
-    const chatId = msg.chat.id;
-
-    if (!waitingForChatImg[chatId]) return;
-
-    if (!isMediaSupported()) {
-      delete waitingForChatImg[chatId];
-      await sendUnsupported(chatId);
-      return;
-    }
-
-    const videoName = waitingForChatImg[chatId];
-    delete waitingForChatImg[chatId];
-
-    try {
-      const fileLink = await bot.getFileLink(msg.video.file_id);
-      const response = await axios.get(fileLink, { responseType: 'arraybuffer' });
-      const buffer = Buffer.from(response.data);
-      const videoSlug = slugify(videoName, { lower: true });
-      const objectName = `chat_${chatId}_${videoSlug}_${Date.now()}.mp4`;
-      const metaData = {
-        'Content-Type': mime.lookup(objectName) || 'video/mp4',
-        'Content-Disposition': 'inline',
-      };
-
-      const fileUrl = await mediaProvider.uploadObject(objectName, buffer, metaData);
-      await photoRepository.upsertPhoto(
-        { chatId: chatId.toString(), photoName: videoName },
-        { url: fileUrl, type: 'video' }
-      );
-
-      await bot.sendMessage(chatId, `✅ Em đã lưu video *${escapeMarkdown(videoName)}* thành công!`, {
-        parse_mode: 'Markdown',
-      });
-    } catch (error) {
-      console.error('Error saving video:', error.message);
-      await bot.sendMessage(chatId, '⚠️ Dạ em xin lỗi, có lỗi khi lưu video ạ!');
-    }
-  });
+  bot.on('photo', (msg) => handleMediaUpload(msg, 'photo'));
+  bot.on('video', (msg) => handleMediaUpload(msg, 'video'));
+  bot.on('animation', (msg) => handleMediaUpload(msg, 'animation'));
+  bot.on('document', (msg) => handleMediaUpload(msg, 'document'));
 
   bot.onText(/\/getphoto (.+)/, async (msg, match) => {
     const chatId = msg.chat.id;
@@ -552,10 +590,7 @@ const registerHandlers = (bot, container) => {
         return;
       }
 
-      await bot.sendPhoto(chatId, photoDoc.url, {
-        caption: `📸*${escapeMarkdown(match[1].trim())}*`,
-        parse_mode: 'Markdown',
-      });
+      await sendMediaHelper(chatId, photoDoc, match[1].trim());
     } catch (error) {
       console.error('Error fetching photo:', error.message);
       await bot.sendMessage(chatId, '⚠️ Dạ em xin lỗi, có lỗi khi lấy ảnh ạ!');
@@ -648,17 +683,7 @@ const registerHandlers = (bot, container) => {
         return;
       }
 
-      if (photoDoc.type === 'video') {
-        await bot.sendVideo(chatId, photoDoc.url, {
-          caption: `📹*${escapeMarkdown(photoName)}*`,
-          parse_mode: 'Markdown',
-        });
-      } else {
-        await bot.sendPhoto(chatId, photoDoc.url, {
-          caption: `📸*${escapeMarkdown(photoName)}*`,
-          parse_mode: 'Markdown',
-        });
-      }
+      await sendMediaHelper(chatId, photoDoc, photoName);
 
       await bot.answerCallbackQuery(callbackQuery.id);
     } catch (error) {
@@ -686,17 +711,7 @@ const registerHandlers = (bot, container) => {
         return;
       }
 
-      if (photoDoc.type === 'video') {
-        await bot.sendVideo(chatId, photoDoc.url, {
-          caption: `📹*${escapeMarkdown(match[1].trim())}*`,
-          parse_mode: 'Markdown',
-        });
-      } else {
-        await bot.sendPhoto(chatId, photoDoc.url, {
-          caption: `📸*${escapeMarkdown(match[1].trim())}*`,
-          parse_mode: 'Markdown',
-        });
-      }
+      await sendMediaHelper(chatId, photoDoc, match[1].trim());
     } catch (error) {
       console.error('Error fetching chat img:', error.message);
       await bot.sendMessage(chatId, '⚠️ Dạ em xin lỗi, có lỗi khi lấy ảnh nhóm ạ!');
