@@ -1,17 +1,17 @@
 # Simple Bot - Telegram Food Ordering And Storage Photo Bot
 
-Bot Telegram đơn giản hỗ trợ đặt cơm hằng ngày trong group, lưu dữ liệu vào MongoDB và thống kê kết quả.
-Ngoài ra còn hỗ trợ lưu trữ và truy xuất hình ảnh theo người dùng, cùng các tính năng vui như mention toàn bộ thành viên, roast bạn bè, và xem vận may ngẫu nhiên.
+Bot Telegram hỗ trợ đặt cơm hằng ngày trong group, thống kê kết quả, lưu ảnh và một số tính năng vui.
+Phiên bản hiện tại đã được refactor theo hướng tách lớp `app / presentation / infrastructure` và có cơ chế fallback khi thiếu dịch vụ ngoài.
 
 ## Cài đặt
 
 ### Yêu cầu
 
 - Node.js 14+
-- MongoDB
+- MongoDB (tuỳ chọn)
 - Telegram Bot Token (từ @BotFather)
-- MinIO (hoặc dịch vụ lưu trữ tương tự)
-- Gemini API Key (nếu sử dụng tính năng AI - https://aistudio.google.com/app/api-keys)
+- MinIO (hoặc dịch vụ lưu trữ tương tự, tuỳ chọn)
+- Google AI API Key (nếu sử dụng tính năng AI, tuỳ chọn)
 
 ### Các bước cài đặt
 
@@ -40,9 +40,11 @@ cp .env.example .env
 TELEGRAM_BOT_TOKEN=your_telegram_bot_token_here
 MONGODB_URI=mongodb://localhost:27017/simple_bot
 MINIO_ENDPOINT=your_minio_endpoint_here
+MINIO_PORT=80
+MINIO_USE_SSL=false
 MINIO_ACCESS_KEY=your_minio_access_key_here
 MINIO_SECRET_KEY=your_minio_secret_key_here
-GEMINI_API_KEY=your_gemini_api_key_here
+GOOGLE_API_KEY=your_google_api_key_here
 ADMIN_CHAT_ID=your_admin_chat_id_here
 ```
 
@@ -62,7 +64,7 @@ npm run dev
 
 ### 1. Gửi thực đơn
 
-Admin gửi tin nhắn bắt đầu bằng "Em gửi thực đơn hôm nay...", bot sẽ tự động lưu thực đơn vào MongoDB.
+Admin dùng `/savemenu`, sau đó gửi menu theo định dạng danh sách món và giá. Nếu không có MongoDB, dữ liệu vẫn được lưu tạm vào `data/runtime/`.
 
 **Ví dụ:**
 
@@ -117,7 +119,7 @@ Sử dụng lệnh `/monthlySummary` để xem thống kê món ăn trong tháng
 
 ### 6. Lưu và lấy ảnh
 
-Bot hỗ trợ lưu trữ và truy xuất ảnh cá nhân của người dùng.
+Bot hỗ trợ lưu trữ và truy xuất ảnh cá nhân của người dùng khi MinIO sẵn sàng. Nếu không có MinIO, các tính năng media sẽ trả về `Tính năng này hiện chưa được hỗ trợ`.
 
 #### Lưu ảnh cá nhân
 
@@ -153,7 +155,7 @@ Sử dụng lệnh `/renamephoto <tên cũ> <tên mới>` để đổi tên ản
 
 ### 7. Ảnh nhóm
 
-Bot hỗ trợ lưu trữ và truy xuất ảnh chia sẻ trong nhóm chat.
+Bot hỗ trợ lưu trữ và truy xuất ảnh chia sẻ trong nhóm chat khi MinIO sẵn sàng.
 
 #### Lưu ảnh nhóm
 
@@ -249,23 +251,40 @@ Bot sẽ trả lời với một câu may mắn ngẫu nhiên như:
 
 ```
 simple_bot/
-├── config/
-│   └── database.js       # Cấu hình kết nối MongoDB
 ├── models/
-│   ├── Menu.js          # Schema cho thực đơn
-│   ├── Order.js         # Schema cho đơn đặt món
-│   ├── Photo.js         # Schema cho ảnh
-│   └── GroupMember.js   # Schema cho thành viên nhóm
-├── utils/
-│   └── minioClient.js   # Cấu hình kết nối MinIO
+│   ├── Menu.js
+│   ├── Order.js
+│   ├── Photo.js
+│   ├── GroupMember.js
+│   └── AIContext.js
+├── src/
+│   ├── app/
+│   │   └── createBotApp.js
+│   ├── bootstrap/
+│   │   └── container.js
+│   ├── common/
+│   │   ├── constants.js
+│   │   └── utils/
+│   ├── infrastructure/
+│   │   ├── database/
+│   │   ├── persistence/
+│   │   ├── providers/
+│   │   └── repositories/
+│   └── presentation/
+│       └── telegram/
+│           └── registerHandlers.js
 ├── data/
-│   └── messages.json    # Dữ liệu cho roast, auto-reply, và lucky
-├── index.js             # File chính của bot
-├── package.json
-├── .env.example
-├── .gitignore
-└── README.md
+│   ├── messages.json
+│   └── runtime/         # Dữ liệu fallback cục bộ
+├── index.js
+└── package.json
 ```
+
+## Chế độ fallback
+
+- Không có MongoDB: bot vẫn chạy, dữ liệu menu, order, group member, AI context và photo metadata sẽ lưu tạm vào `data/runtime/`.
+- Không có MinIO: các lệnh media như `/savephoto`, `/getphoto`, `/allphoto`, `/renamephoto`, `/savechatimg`, `/getchatimg`, `/allchatimg`, `/renamechatimg` sẽ trả về `Tính năng này hiện chưa được hỗ trợ`.
+- Không có `GOOGLE_API_KEY`: các lệnh AI sẽ trả về `Tính năng này hiện chưa được hỗ trợ`.
 
 ## Database Schema
 
