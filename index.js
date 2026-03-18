@@ -1,5 +1,5 @@
+process.env.NTBA_FIX_350 = '1';
 const { createBotApp } = require('./src/app/createBotApp');
-
 createBotApp()
   .then(({ container }) => {
     console.log(

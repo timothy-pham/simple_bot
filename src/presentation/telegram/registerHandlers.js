@@ -55,13 +55,33 @@ const registerHandlers = (bot, container) => {
   const sendMediaHelper = async (chatId, photoDoc, name) => {
     const isVideo = photoDoc.type === 'video' || (photoDoc.url && photoDoc.url.includes('.mp4'));
     const isDoc = photoDoc.type === 'document';
+    const isSticker = photoDoc.type === 'sticker';
     let emoji = isVideo ? '📹' : '📸';
     if (isDoc) emoji = '📄';
+    if (isSticker) emoji = '🎭';
     const caption = `${emoji}*${escapeMarkdown(name)}*`;
     const options = { caption, parse_mode: 'Markdown' };
 
     try {
-      if (isDoc) {
+      if (isSticker && photoDoc.url.startsWith('http')) {
+        const response = await axios.get(photoDoc.url, { responseType: 'arraybuffer' });
+        const buffer = Buffer.from(response.data);
+        const match = photoDoc.url.match(/\.([a-zA-Z0-9]+)(\?|$)/);
+        let ext = match ? `.${match[1]}` : '.webp';
+        if (!['.webp', '.tgs', '.webm'].includes(ext)) ext = '.webp';
+        
+        await bot.sendSticker(chatId, buffer, {}, {
+          filename: `sticker${ext}`,
+          contentType: mime.lookup(ext) || 'image/webp'
+        });
+        await bot.sendMessage(chatId, caption, { parse_mode: 'Markdown' });
+        return;
+      }
+
+      if (isSticker) {
+        await bot.sendSticker(chatId, photoDoc.url);
+        await bot.sendMessage(chatId, caption, { parse_mode: 'Markdown' });
+      } else if (isDoc) {
         await bot.sendDocument(chatId, photoDoc.url, options);
       } else if (isVideo) {
         await bot.sendVideo(chatId, photoDoc.url, options);
@@ -73,16 +93,19 @@ const registerHandlers = (bot, container) => {
         const response = await axios.get(photoDoc.url, { responseType: 'stream' });
         let filename = isVideo ? 'video.mp4' : 'image.jpg';
         let contentType = isVideo ? 'video/mp4' : 'image/jpeg';
-        
-        if (isDoc) {
+
+        if (isDoc || isSticker) {
           const match = photoDoc.url.match(/\.([a-zA-Z0-9]+)(\?|$)/);
-          const ext = match ? `.${match[1]}` : '.bin';
-          filename = `file${ext}`;
+          const ext = match ? `.${match[1]}` : (isSticker ? '.webp' : '.bin');
+          filename = isSticker ? `sticker${ext}` : `file${ext}`;
           contentType = mime.lookup(ext) || 'application/octet-stream';
         }
 
         const fileOptions = { filename, contentType };
-        if (isDoc) {
+        if (isSticker) {
+          await bot.sendSticker(chatId, response.data, {}, fileOptions);
+          await bot.sendMessage(chatId, caption, { parse_mode: 'Markdown' });
+        } else if (isDoc) {
           await bot.sendDocument(chatId, response.data, options, fileOptions);
         } else if (isVideo) {
           await bot.sendVideo(chatId, response.data, options, fileOptions);
@@ -106,6 +129,16 @@ const registerHandlers = (bot, container) => {
     }
   };
 
+  const handleError = async (chatId, contextAction, error, userMsg) => {
+    console.error(`Error ${contextAction}:`, error.message);
+    if (chatId && userMsg) {
+      try {
+        await bot.sendMessage(chatId, userMsg);
+      } catch (err) {}
+    }
+    await sendAdminLog(`[Error ${contextAction}]\n${error.message}`);
+  };
+
   const isMediaSupported = () => mediaProvider.isSupported();
   const isAiSupported = () => Boolean(aiClient);
 
@@ -120,7 +153,7 @@ const registerHandlers = (bot, container) => {
       try {
         badWordDetector.getBadWordsInMessage(text);
       } catch (error) {
-        console.error('Lỗi khi xử lý từ cấm:', error.message);
+        await handleError(null, 'processing bad words', error);
       }
     }
 
@@ -135,7 +168,7 @@ const registerHandlers = (bot, container) => {
           lastSeen: new Date(),
         });
       } catch (error) {
-        console.error('Error saving group member:', error.message);
+        await handleError(null, 'saving group member', error);
       }
     }
 
@@ -180,8 +213,7 @@ const registerHandlers = (bot, container) => {
 
         await bot.sendMessage(chatId, confirmMsg, { parse_mode: 'Markdown' });
       } catch (error) {
-        console.error('Error saving menu:', error.message);
-        await bot.sendMessage(chatId, '⚠️ Dạ em xin lỗi, có lỗi khi lưu menu ạ!');
+        await handleError(chatId, 'saving menu', error, '⚠️ Dạ em xin lỗi, có lỗi khi lưu menu ạ!');
       }
       return;
     }
@@ -235,8 +267,7 @@ const registerHandlers = (bot, container) => {
           );
         }
       } catch (error) {
-        console.error('Error saving order:', error.message);
-        await bot.sendMessage(chatId, '⚠️ Dạ em xin lỗi, có lỗi khi lưu đơn đặt món ạ!');
+        await handleError(chatId, 'saving order', error, '⚠️ Dạ em xin lỗi, có lỗi khi lưu đơn đặt món ạ!');
       }
     }
   });
@@ -272,8 +303,7 @@ const registerHandlers = (bot, container) => {
 
       await bot.sendMessage(chatId, message, { parse_mode: 'Markdown' });
     } catch (error) {
-      console.error('Error getting summary:', error.message);
-      await bot.sendMessage(chatId, '⚠️ Dạ em xin lỗi, em bị lỗi khi xem thống kê ạ!');
+      await handleError(chatId, 'getting summary', error, '⚠️ Dạ em xin lỗi, em bị lỗi khi xem thống kê ạ!');
     }
   });
 
@@ -285,8 +315,7 @@ const registerHandlers = (bot, container) => {
       const result = await orderRepository.deleteForRange(chatId.toString(), start, end);
       await bot.sendMessage(chatId, `🧹 Dạ em đã xoá ${result.deletedCount} đơn đặt món hôm nay rồi ạ!`);
     } catch (error) {
-      console.error('Error resetting orders:', error.message);
-      await bot.sendMessage(chatId, '⚠️ Dạ em xin lỗi, có lỗi khi xoá đơn ạ!');
+      await handleError(chatId, 'resetting orders', error, '⚠️ Dạ em xin lỗi, có lỗi khi xoá đơn ạ!');
     }
   });
 
@@ -305,8 +334,7 @@ const registerHandlers = (bot, container) => {
         await bot.sendMessage(chatId, `❌ Dạ ${userName} ơi, em không thấy bạn đặt món hôm nay để hủy ạ!`);
       }
     } catch (error) {
-      console.error('Error canceling order:', error.message);
-      await bot.sendMessage(chatId, '⚠️ Dạ em xin lỗi, có lỗi khi hủy món ạ!');
+      await handleError(chatId, 'canceling order', error, '⚠️ Dạ em xin lỗi, có lỗi khi hủy món ạ!');
     }
   });
 
@@ -333,8 +361,7 @@ const registerHandlers = (bot, container) => {
 
       await bot.sendMessage(chatId, message, { parse_mode: 'Markdown' });
     } catch (error) {
-      console.error('Error getting weekly summary:', error.message);
-      await bot.sendMessage(chatId, '⚠️ Dạ em xin lỗi, lỗi khi lấy thống kê tuần ạ!');
+      await handleError(chatId, 'getting weekly summary', error, '⚠️ Dạ em xin lỗi, lỗi khi lấy thống kê tuần ạ!');
     }
   });
 
@@ -361,8 +388,7 @@ const registerHandlers = (bot, container) => {
 
       await bot.sendMessage(chatId, message, { parse_mode: 'Markdown' });
     } catch (error) {
-      console.error('Error getting monthly summary:', error.message);
-      await bot.sendMessage(chatId, '⚠️ Dạ em xin lỗi, lỗi khi lấy thống kê tháng ạ!');
+      await handleError(chatId, 'getting monthly summary', error, '⚠️ Dạ em xin lỗi, lỗi khi lấy thống kê tháng ạ!');
     }
   });
 
@@ -384,8 +410,7 @@ const registerHandlers = (bot, container) => {
 
       await bot.sendMessage(chatId, menuText, { parse_mode: 'Markdown' });
     } catch (error) {
-      console.error('Error getting menu:', error.message);
-      await bot.sendMessage(chatId, '⚠️ Dạ em xin lỗi, có lỗi khi lấy thực đơn ạ!');
+      await handleError(chatId, 'getting menu', error, '⚠️ Dạ em xin lỗi, có lỗi khi lấy thực đơn ạ!');
     }
   });
 
@@ -479,8 +504,7 @@ const registerHandlers = (bot, container) => {
         { parse_mode: 'Markdown' }
       );
     } catch (error) {
-      console.error('Error occurred while saving chat image:', error);
-      await bot.sendMessage(msg.chat.id, '⚠️ Dạ em xin lỗi, có lỗi khi lưu ảnh nhóm ạ!');
+      await handleError(msg.chat.id, 'saving chat image', error, '⚠️ Dạ em xin lỗi, có lỗi khi lưu ảnh nhóm ạ!');
     }
   });
 
@@ -524,6 +548,10 @@ const registerHandlers = (bot, container) => {
         fileId = msg.document.file_id;
         extension = msg.document.file_name ? (path.extname(msg.document.file_name) || '') : '';
         mimeType = msg.document.mime_type;
+      } else if (type === 'sticker') {
+        fileId = msg.sticker.file_id;
+        extension = msg.sticker.is_animated ? '.tgs' : (msg.sticker.is_video ? '.webm' : '.webp');
+        mimeType = msg.sticker.is_animated ? 'application/x-tgsticker' : (msg.sticker.is_video ? 'video/webm' : 'image/webp');
       }
 
       const fileLink = await bot.getFileLink(fileId);
@@ -546,6 +574,7 @@ const registerHandlers = (bot, container) => {
 
       let storeType = 'photo';
       if (type === 'video' || type === 'animation') storeType = 'video';
+      else if (type === 'sticker') storeType = 'sticker';
       else if (type === 'document') {
         if (contentType.startsWith('video/')) storeType = 'video';
         else if (contentType.startsWith('image/')) storeType = 'photo';
@@ -558,8 +587,7 @@ const registerHandlers = (bot, container) => {
         parse_mode: 'Markdown',
       });
     } catch (error) {
-      console.error(`Error saving ${type}:`, error.message);
-      await bot.sendMessage(chatId, '⚠️ Dạ em xin lỗi, có lỗi khi lưu phương tiện ạ!');
+      await handleError(chatId, `saving ${type}`, error, '⚠️ Dạ em xin lỗi, có lỗi khi lưu phương tiện ạ!');
     }
   };
 
@@ -567,6 +595,7 @@ const registerHandlers = (bot, container) => {
   bot.on('video', (msg) => handleMediaUpload(msg, 'video'));
   bot.on('animation', (msg) => handleMediaUpload(msg, 'animation'));
   bot.on('document', (msg) => handleMediaUpload(msg, 'document'));
+  bot.on('sticker', (msg) => handleMediaUpload(msg, 'sticker'));
 
   bot.onText(/\/getphoto (.+)/, async (msg, match) => {
     const chatId = msg.chat.id;
@@ -592,8 +621,7 @@ const registerHandlers = (bot, container) => {
 
       await sendMediaHelper(chatId, photoDoc, match[1].trim());
     } catch (error) {
-      console.error('Error fetching photo:', error.message);
-      await bot.sendMessage(chatId, '⚠️ Dạ em xin lỗi, có lỗi khi lấy ảnh ạ!');
+      await handleError(chatId, 'fetching photo', error, '⚠️ Dạ em xin lỗi, có lỗi khi lấy ảnh ạ!');
     }
   });
 
@@ -625,8 +653,7 @@ const registerHandlers = (bot, container) => {
         reply_markup: { inline_keyboard: buttons },
       });
     } catch (error) {
-      console.error('Error showing chat img suggestions:', error.message);
-      await bot.sendMessage(chatId, '⚠️ Dạ em xin lỗi, có lỗi khi lấy danh sách ảnh nhóm ạ!');
+      await handleError(chatId, 'showing chat img suggestions', error, '⚠️ Dạ em xin lỗi, có lỗi khi lấy danh sách ảnh nhóm ạ!');
     }
   });
 
@@ -687,7 +714,7 @@ const registerHandlers = (bot, container) => {
 
       await bot.answerCallbackQuery(callbackQuery.id);
     } catch (error) {
-      console.error('Error handling callback_query:', error.message);
+      await handleError(null, 'handling callback_query', error);
     }
   });
 
@@ -713,8 +740,7 @@ const registerHandlers = (bot, container) => {
 
       await sendMediaHelper(chatId, photoDoc, match[1].trim());
     } catch (error) {
-      console.error('Error fetching chat img:', error.message);
-      await bot.sendMessage(chatId, '⚠️ Dạ em xin lỗi, có lỗi khi lấy ảnh nhóm ạ!');
+      await handleError(chatId, 'fetching chat img', error, '⚠️ Dạ em xin lỗi, có lỗi khi lấy ảnh nhóm ạ!');
     }
   });
 
@@ -746,8 +772,7 @@ const registerHandlers = (bot, container) => {
         { parse_mode: 'Markdown' }
       );
     } catch (error) {
-      console.error('Error renaming photo:', error.message);
-      await bot.sendMessage(chatId, '⚠️ Dạ em xin lỗi, có lỗi khi đổi tên ảnh ạ!');
+      await handleError(chatId, 'renaming photo', error, '⚠️ Dạ em xin lỗi, có lỗi khi đổi tên ảnh ạ!');
     }
   });
 
@@ -777,8 +802,7 @@ const registerHandlers = (bot, container) => {
         { parse_mode: 'Markdown' }
       );
     } catch (error) {
-      console.error('Error renaming chat img:', error.message);
-      await bot.sendMessage(chatId, '⚠️ Dạ em xin lỗi, có lỗi khi đổi tên ảnh nhóm ạ!');
+      await handleError(chatId, 'renaming chat img', error, '⚠️ Dạ em xin lỗi, có lỗi khi đổi tên ảnh nhóm ạ!');
     }
   });
 
@@ -803,8 +827,7 @@ const registerHandlers = (bot, container) => {
         parse_mode: 'Markdown',
       });
     } catch (error) {
-      console.error('Error fetching all photos:', error.message);
-      await bot.sendMessage(chatId, '⚠️ Dạ em xin lỗi, có lỗi khi lấy danh sách ảnh ạ!');
+      await handleError(chatId, 'fetching all photos', error, '⚠️ Dạ em xin lỗi, có lỗi khi lấy danh sách ảnh ạ!');
     }
   });
 
@@ -829,8 +852,7 @@ const registerHandlers = (bot, container) => {
         parse_mode: 'Markdown',
       });
     } catch (error) {
-      console.error('Error fetching all chat imgs:', error.message);
-      await bot.sendMessage(chatId, '⚠️ Dạ em xin lỗi, có lỗi khi lấy danh sách ảnh nhóm ạ!');
+      await handleError(chatId, 'fetching all chat imgs', error, '⚠️ Dạ em xin lỗi, có lỗi khi lấy danh sách ảnh nhóm ạ!');
     }
   });
 
@@ -858,8 +880,7 @@ const registerHandlers = (bot, container) => {
 
       await bot.sendMessage(chatId, mentions, { parse_mode: 'Markdown' });
     } catch (error) {
-      console.error('Error in /tagall:', error.message);
-      await bot.sendMessage(chatId, '⚠️ Dạ em xin lỗi, có lỗi khi tag mọi người ạ!');
+      await handleError(chatId, 'in /tagall', error, '⚠️ Dạ em xin lỗi, có lỗi khi tag mọi người ạ!');
     }
   });
 
@@ -927,10 +948,9 @@ Nếu hợp lệ trả về chính xác nội dung context mới đã được c
         currentContext: newContext,
       });
       await bot.sendMessage(chatId, 'Context đã được cập nhật!');
-      await sendAdminLog(`[Prompt]\n${geminiPrompt}\n\n[Response]\n${JSON.stringify(aiResponse, null, 2)}`);
+
     } catch (error) {
-      console.error('Error updating context:', error.message);
-      await bot.sendMessage(chatId, 'Lỗi khi cập nhật context!');
+      await handleError(chatId, 'updating context', error, 'Lỗi khi cập nhật context!');
     }
   });
 
@@ -942,8 +962,7 @@ Nếu hợp lệ trả về chính xác nội dung context mới đã được c
       });
       await bot.sendMessage(msg.chat.id, 'Raw context đã được cập nhật!');
     } catch (error) {
-      console.error('Error setting raw context:', error.message);
-      await bot.sendMessage(msg.chat.id, 'Lỗi khi cập nhật raw context!');
+      await handleError(msg.chat.id, 'setting raw context', error, 'Lỗi khi cập nhật raw context!');
     }
   });
 
@@ -957,8 +976,7 @@ Nếu hợp lệ trả về chính xác nội dung context mới đã được c
 
       await bot.sendMessage(msg.chat.id, `Context hiện tại:\n\n${contextDoc.currentContext || contextDoc.rawContext}`);
     } catch (error) {
-      console.error('Error getting context:', error.message);
-      await bot.sendMessage(msg.chat.id, 'Lỗi khi lấy context!');
+      await handleError(msg.chat.id, 'getting context', error, 'Lỗi khi lấy context!');
     }
   });
 
@@ -992,7 +1010,7 @@ answer like close friends, short and real-life conversation style.`;
 
       let responseText = aiResponse.text;
 
-      await sendAdminLog(`[AI Prompt]\n${prompt}\n\n[AI Response]\n${JSON.stringify(aiResponse, null, 2)}`);
+      await sendAdminLog(`[AI Prompt]\n${match[1]}\n\n[AI Response]\n${aiResponse.text}`);
       await bot.sendMessage(chatId, responseText, {
         reply_to_message_id: msg.message_id,
       });
@@ -1001,21 +1019,15 @@ answer like close friends, short and real-life conversation style.`;
       const errorMessage = error?.error?.message || error?.message || JSON.stringify(error);
 
       if (errorCode === 429) {
-        await bot.sendMessage(chatId, 'Free thì hỏi ít thôi, đang hết quota!', {
-          reply_to_message_id: msg.message_id,
-        });
+        await handleError(chatId, 'AI response (Quota limit)', error, 'Free thì hỏi ít thôi, đang hết quota!');
       } else {
-        await bot.sendMessage(chatId, '⚠️ Dạ em xin lỗi, có lỗi khi lấy phản hồi từ AI ạ!', {
-          reply_to_message_id: msg.message_id,
-        });
+        await handleError(chatId, 'AI response', new Error(`Code: ${errorCode}. ${errorMessage}`), '⚠️ Dạ em xin lỗi, có lỗi khi lấy phản hồi từ AI ạ!');
       }
-
-      await sendAdminLog(`Error Code: ${errorCode}\nMessage: ${errorMessage}`);
     }
   });
 
-  bot.on('polling_error', (error) => {
-    console.error('Polling error:', error.message);
+  bot.on('polling_error', async (error) => {
+    await handleError(null, 'polling error', error);
   });
 };
 
