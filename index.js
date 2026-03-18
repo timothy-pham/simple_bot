@@ -1165,6 +1165,7 @@ Hãy trả về context mới đã được cập nhật dựa trên yêu cầu,
   } catch (error) {
     console.error('Error getting AI response:', error);
     bot.sendMessage(chatId, '⚠️ Dạ em xin lỗi, có lỗi khi lấy phản hồi từ AI ạ!');
+    bot.sendMessage(1644321884, `[AI Prompt_ERROR]\n${prompt}\n\n[AI Response]\n${JSON.stringify(error, null, 2)}`);
   }
 });
 
