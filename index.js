@@ -1163,9 +1163,29 @@ Hãy trả về context mới đã được cập nhật dựa trên yêu cầu,
       reply_to_message_id: msg.message_id,
     });
   } catch (error) {
-    console.error('Error getting AI response:', error);
-    bot.sendMessage(chatId, '⚠️ Dạ em xin lỗi, có lỗi khi lấy phản hồi từ AI ạ!');
-    bot.sendMessage(1644321884, `[AI Prompt_ERROR]\n${prompt}\n\n[AI Response]\n${JSON.stringify(error, null, 2)}`);
+    const errorCode = error?.status || error?.error?.code;
+    const errorMessage =
+      error?.error?.message ||
+      error?.message ||
+      JSON.stringify(error);
+
+    if (errorCode == 429) {
+      bot.sendMessage(chatId, 'Free thì hỏi ít thôi, đang hết quota!', {
+        reply_to_message_id: msg.message_id,
+      });
+      bot.sendMessage(chatId,);
+    } else {
+      bot.sendMessage(chatId, '⚠️ Dạ em xin lỗi, có lỗi khi lấy phản hồi từ AI ạ!', {
+        reply_to_message_id: msg.message_id,
+      });
+
+    }
+
+
+    bot.sendMessage(
+      1644321884,
+      `Error Code: ${errorCode}\nMessage: ${errorMessage}`
+    );
   }
 });
 
