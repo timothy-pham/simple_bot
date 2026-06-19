@@ -69,7 +69,7 @@ const registerHandlers = (bot, container) => {
         const match = photoDoc.url.match(/\.([a-zA-Z0-9]+)(\?|$)/);
         let ext = match ? `.${match[1]}` : '.webp';
         if (!['.webp', '.tgs', '.webm'].includes(ext)) ext = '.webp';
-        
+
         await bot.sendSticker(chatId, buffer, {}, {
           filename: `sticker${ext}`,
           contentType: mime.lookup(ext) || 'image/webp'
@@ -134,7 +134,7 @@ const registerHandlers = (bot, container) => {
     if (chatId && userMsg) {
       try {
         await bot.sendMessage(chatId, userMsg);
-      } catch (err) {}
+      } catch (err) { }
     }
     await sendAdminLog(`[Error ${contextAction}]\n${error.message}`);
   };
@@ -149,13 +149,13 @@ const registerHandlers = (bot, container) => {
 
     if (!text) return;
 
-    if (badWordDetector.containsBadWord(text)) {
-      try {
-        badWordDetector.getBadWordsInMessage(text);
-      } catch (error) {
-        await handleError(null, 'processing bad words', error);
-      }
-    }
+    // if (badWordDetector.containsBadWord(text)) {
+    //   try {
+    //     badWordDetector.getBadWordsInMessage(text);
+    //   } catch (error) {
+    //     await handleError(null, 'processing bad words', error);
+    //   }
+    // }
 
     if (msg.chat.type === 'group' || msg.chat.type === 'supergroup') {
       try {
@@ -172,15 +172,15 @@ const registerHandlers = (bot, container) => {
       }
     }
 
-    if (!text.startsWith('/')) {
-      const lowerText = text.toLowerCase();
-      for (const [trigger, reply] of Object.entries(messages.autoReplies)) {
-        if (lowerText.includes(trigger)) {
-          await bot.sendMessage(chatId, reply);
-          break;
-        }
-      }
-    }
+    // if (!text.startsWith('/')) {
+    //   const lowerText = text.toLowerCase();
+    //   for (const [trigger, reply] of Object.entries(messages.autoReplies)) {
+    //     if (lowerText.includes(trigger)) {
+    //       await bot.sendMessage(chatId, reply);
+    //       break;
+    //     }
+    //   }
+    // }
 
     if (waitingForMenu[chatId] && !text.startsWith('/')) {
       delete waitingForMenu[chatId];
